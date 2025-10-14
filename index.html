@@ -1,57 +1,78 @@
 <!DOCTYPE html>
 <html lang="sv">
+<head>
+<meta charset="utf-8" />
 <meta name="viewport"
-  content="width=device-width, initial-scale=1, viewport-fit=cover, shrink-to-fit=no">
+      content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<title>Väggtimer (kompat)</title>
 <style>
-  /* 1) Gör text och komponenter proportionerliga på surfplattor */
   :root{
-    /* Bas i rem som följer minsta av bredd/höjd, men aldrig för liten/stor */
-    font-size: clamp(14px, min(2.8vw, 3.2vh), 28px);
-    --pad: max(0.5rem, 2svh);     /* ersätt 8px/2vh med rem/svh */
-    --radius: 1.25rem;
-    --touch: 3rem;                 /* ~48px touch-minimum, men responsivt */
+    --pad: 16px;
+    --radius: 20px;
+    --touch: 48px;
   }
-
-  /* 2) Hindra webkit/Android från att krympa text konstigt */
-  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-  body {
+  html,body{height:100%}
+  body{
     margin:0;
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial;
+    font-family: ui-sans-serif, system-ui, -apple-system,"Segoe UI",Roboto,Helvetica,Arial;
     color:#fff;
     background:#000;
-    /* 3) Använd nya viewport-enheter som funkar bättre med mobila adressfält */
-    height: 100svh;          /* “small viewport height” */
-    min-height: 100svh;
     overflow:hidden;
     transition: background .25s ease;
+    -webkit-text-size-adjust:100%;
+    text-size-adjust:100%;
+  }
+  body.danger{ background:#8b0000; }
+
+  .wrap{position:relative; height:100%; width:100%; display:grid; place-items:center; padding: var(--pad,16px);}
+  .stage{
+    width:100%; height:100%;
+    padding:20px;
+    box-sizing:border-box;
+    display:grid;
+    grid-template-rows:auto 1fr auto auto;
+    gap:12px;
   }
 
-  /* fallback för äldre webview om svh saknas */
-  @supports not (height: 100svh) {
-    body { height: 100vh; min-height: 100vh; }
+  .title{ text-align:center; font-weight:800; font-size:24px; letter-spacing:.3px; opacity:.95; }
+  .time{ display:grid; place-items:center; text-align:center; font-weight:900;
+         line-height:1.0; letter-spacing:.4px; font-size:140px; white-space:nowrap; margin-bottom:8px; }
+
+  .bar{ position:relative; height:24px; background:#e6e6e6; border-radius:999px; overflow:hidden; }
+  .fill{ position:absolute; inset:0 auto 0 0; width:0%; background:linear-gradient(90deg,#fff,#dcdcdc); border-radius:inherit; }
+
+  .ticks{ position:relative; height:34px;}
+  .tick{ position:absolute; top:0; transform:translateX(-50%); text-align:center; }
+  .tick i{ display:block; width:2px; height:16px; background:rgba(255,255,255,.95); margin:0 auto 6px; border-radius:2px; }
+  .tick span{ font-size:14px; opacity:.95; }
+  .tick.end i{ width:3px; height:22px; background:#fff; }
+  .tick.end span{ font-weight:800; }
+
+  .footer{ display:flex; justify-content:space-between; align-items:center; gap:12px; font-weight:600; opacity:.95; font-size:16px; }
+  .pills{ display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+  .pill{ padding:.35em .8em; background:#121212; border:1px solid #2a2a2a; border-radius:999px; }
+
+  .fab{
+    position:absolute;
+    right:16px; bottom:16px;
+    width:64px; height:64px;
+    border-radius:999px; display:grid; place-items:center;
+    background:#151515; color:#fff; border:1px solid #2a2a2a;
+    font-size:18px;
+    user-select:none; cursor:pointer; touch-action:manipulation;
   }
 
-  /* Exempel: gör stora siffror som skalar snyggt på platta */
-  .timer {
-    font-variant-numeric: tabular-nums lining-nums;
-    font-weight: 700;
-    /* 4) Skala text efter bredd/höjd – blir stort på platta, inte pyttigt */
-    font-size: clamp(2rem, 10vmin, 8rem);
-    line-height: 1;
-    letter-spacing: 0.04em;
+  .settings{
+    position:absolute; inset:0; background:rgba(0,0,0,.94);
+    border:none; padding:20px; display:none; overflow:auto;
   }
-
-  /* Knappar/ytor får rimliga touch-mått */
-  .btn {
-    min-height: var(--touch);
-    min-width: calc(var(--touch) * 2);
-    padding: 0 1rem;
-    border-radius: var(--radius);
-  }
-
-  /* Behåll dina färg- och statusklasser som tidigare */
-  body.danger { background:#8b0000; }
+  .settings h2{margin:.2em 0 .6em; font-size:22px;}
+  .row{display:grid; grid-template-columns:1.2fr 1fr 1fr auto; gap:10px; align-items:center; margin:.5em 0;}
+  .row input{ padding:.8em .9em; border-radius:12px; border:1px solid #2a2a2a; background:#0d0d0d; color:#fff; font-size:16px;}
+  .settings .actions{display:flex; gap:12px; margin-top:10px; flex-wrap:wrap;}
+  .settings button{ padding:.9em 1.1em; min-height:48px; border-radius:12px; border:1px solid #2a2a2a; background:#101010; color:#fff; font-weight:700; cursor:pointer; font-size:16px;}
 </style>
+</head>
 <body>
   <div class="wrap">
     <div class="stage" id="stage">
@@ -85,192 +106,164 @@
   </div>
 
 <script>
-(function(){
-  var $ = function(s){ return document.querySelector(s); };
-  var title=$('#title'), timeEl=$('#time'), fill=$('#fill'), ticks=$('#ticks');
-  var active=$('#activePeriod'), nextP=$('#nextPeriod'), settings=$('#settings');
+const $ = s=>document.querySelector(s);
+const title=$('#title'), timeEl=$('#time'), fill=$('#fill'), ticks=$('#ticks');
+const active=$('#activePeriod'), nextP=$('#nextPeriod'), settings=$('#settings');
 
-  var DEFAULT_PERIODS = [
-    { name:"Morgon",     start:"07:00", end:"09:00" },
-    { name:"Arbetstid",  start:"09:00", end:"17:00" },
-    { name:"Kväll",      start:"17:00", end:"22:30" },
-    { name:"Läggdags",   start:"22:30", end:"24:00" },
-    { name:"Natt",       start:"00:00", end:"07:00" }
-  ];
+const DEFAULT_PERIODS = [
+  { name:"Morgon", start:"07:00", end:"09:00" },
+  { name:"Arbetstid", start:"09:00", end:"17:00" },
+  { name:"Kväll", start:"17:00", end:"22:30" },
+  { name:"Läggdags", start:"22:30", end:"23:59" },
+  { name:"Natt", start:"00:00", end:"07:00" },
+];
 
-  function getPeriods(){
-    try{
-      var r=localStorage.getItem('walltimer.periods');
-      var arr=r?JSON.parse(r):DEFAULT_PERIODS;
-      if (Object.prototype.toString.call(arr)==='[object Array]' && arr.length){ return arr; }
-      return DEFAULT_PERIODS;
-    }catch(e){ return DEFAULT_PERIODS; }
+function getPeriods(){
+  try{
+    const r = localStorage.getItem('walltimer.periods');
+    const arr = r ? JSON.parse(r) : DEFAULT_PERIODS;
+    return (Array.isArray(arr)&&arr.length)?arr:DEFAULT_PERIODS;
+  }catch{return DEFAULT_PERIODS;}
+}
+function setPeriods(p){ localStorage.setItem('walltimer.periods', JSON.stringify(p)); }
+
+function t2m(t){ const [h,m]=t.split(':').map(Number); return (h%24)*60+(m||0); }
+function nowMin(){ const n=new Date(); return n.getHours()*60+n.getMinutes()+n.getSeconds()/60; }
+function fmt(ms){ let s=Math.max(0,Math.floor(ms/1000)); const h=Math.floor(s/3600); s-=h*3600; const m=Math.floor(s/60); s-=m*60; return `${h}h ${m}m ${String(s).padStart(2,'0')}s`; }
+
+function expand(ps){
+  const out=[];
+  for(const p of ps){
+    const a=t2m(p.start), b=t2m(p.end);
+    if(b>=a){ out.push({...p,a,b}); }
+    else { out.push({...p,a,b:1440}); out.push({...p,name:p.name,a:0,b}); }
   }
-  function setPeriods(p){ localStorage.setItem('walltimer.periods', JSON.stringify(p)); }
+  return out.sort((x,y)=>x.a-y.a);
+}
 
-  function t2m(t){ var parts=t.split(':'), h=parseInt(parts[0],10)||0, m=parseInt(parts[1],10)||0; return (h%24)*60+m; }
-  function nowMin(){ var n=new Date(); return n.getHours()*60+n.getMinutes()+n.getSeconds()/60; }
-  function z2(n){ n=String(n); return n.length<2 ? ('0'+n) : n; }
-  function fmt(ms){
-    var s=Math.max(0, Math.floor(ms/1000));
-    var h=Math.floor(s/3600); s-=h*3600;
-    var m=Math.floor(s/60); s-=m*60;
-    return h+'h '+m+'m '+z2(s)+'s';
+function pick(ps){
+  const n=nowMin(), list=expand(ps);
+  let cur=null, nxt=null;
+  for(let i=0;i<list.length;i++){
+    const p=list[i];
+    if(n>=p.a && n<p.b){ cur=p; nxt=list[(i+1)%list.length]; break; }
   }
-
-  function expand(ps){
-    var out=[], i, p, a, b;
-    for(i=0;i<ps.length;i++){
-      p=ps[i]; a=t2m(p.start); b=t2m(p.end);
-      if(b>=a){ out.push({name:p.name,start:p.start,end:p.end,a:a,b:b}); }
-      else { out.push({name:p.name,start:p.start,end:p.end,a:a,b:1440}); out.push({name:p.name,start:p.start,end:p.end,a:0,b:b}); }
-    }
-    out.sort(function(x,y){ return x.a-y.a; });
-    return out;
+  if(!cur){
+    nxt=list.find(p=>p.a>n)||list[0];
+    cur={name:"Paus",a:n,b:nxt.a};
   }
+  return {cur,nxt};
+}
 
-  function pick(ps){
-    var n=nowMin(), list=expand(ps);
-    var i, cur=null, nxt=null;
-    for(i=0;i<list.length;i++){
-      var p=list[i];
-      if(n>=p.a && n<p.b){ cur=p; nxt=list[(i+1)%list.length]; break; }
-    }
-    if(!cur){
-      for(i=0;i<list.length;i++){ if(list[i].a>n){ nxt=list[i]; break; } }
-      if(!nxt) nxt=list[0];
-      cur = { name:"Paus", a:n, b:nxt.a };
-    }
-    return {cur:cur, nxt:nxt};
+function chooseTickStep(totalMin){
+  if(totalMin<=120)return 30;
+  if(totalMin<=480)return 60;
+  return 120;
+}
+function fmtTick(mins){ if(mins%60===0)return`${mins/60}h`; return`${mins%60}m`; }
+function drawTicks(totalMin){
+  ticks.innerHTML='';
+  const step=chooseTickStep(totalMin);
+  for(let at=0;at<=totalMin;at+=step){
+    const left=(at/totalMin)*100;
+    const div=document.createElement('div');
+    div.className='tick';
+    div.style.left=left+'%';
+    div.innerHTML=`<i></i><span>${fmtTick(at)}</span>`;
+    ticks.appendChild(div);
   }
+  const end=document.createElement('div');
+  end.className='tick end';
+  end.style.left='100%';
+  end.innerHTML=`<i></i><span>slut</span>`;
+  ticks.appendChild(end);
+}
 
-  function chooseTickStep(totalMin){
-    if (totalMin <= 120) return 30;
-    if (totalMin <= 480) return 60;
-    return 120;
-  }
-  function fmtTick(mins){
-    if (mins % 60 === 0) return (mins/60)+'h';
-    return (mins%60)+'m';
-  }
-  function drawTicks(totalMin){
-    ticks.innerHTML='';
-    var step = chooseTickStep(totalMin);
-    for(var at=0; at<=totalMin; at+=step){
-      var left = (at/totalMin)*100;
-      var div = document.createElement('div');
-      div.className='tick';
-      div.style.left = left+'%';
-      div.innerHTML = '<i></i><span>'+fmtTick(at)+'</span>';
-      ticks.appendChild(div);
-    }
-    var end = document.createElement('div');
-    end.className = 'tick end';
-    end.style.left = '100%';
-    end.innerHTML = '<i></i><span>slut</span>';
-    ticks.appendChild(end);
-  }
+let audioCtx;
+function beep(ms=200,freq=880){
+  try{
+    audioCtx=audioCtx||new(window.AudioContext||window.webkitAudioContext)();
+    const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    o.connect(g);g.connect(audioCtx.destination);
+    o.type='sine';o.frequency.value=freq;g.gain.value=.05;o.start();
+    setTimeout(()=>o.stop(),ms);
+  }catch(e){}
+}
 
-  var audioCtx;
-  function beep(ms,freq){
-    ms = ms || 200; freq = freq || 880;
-    try{
-      audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
-      var o=audioCtx.createOscillator(), g=audioCtx.createGain();
-      o.connect(g); g.connect(audioCtx.destination);
-      o.type='sine'; o.frequency.value=freq; g.gain.value=.05; o.start();
-      setTimeout(function(){ try{o.stop();}catch(e){} }, ms);
-    }catch(e){}
-  }
+function loop(){
+  const ps=getPeriods();
+  const {cur,nxt}=pick(ps);
+  const n=new Date();
+  const nMin=n.getHours()*60+n.getMinutes()+n.getSeconds()/60;
+  const total=(cur.b-cur.a)*60*1000;
+  const passed=(nMin-cur.a)*60*1000;
+  const remain=Math.max(0,total-passed);
 
-  function loop(){
-    var ps=getPeriods();
-    var pickRes=pick(ps); var cur=pickRes.cur, nxt=pickRes.nxt;
+  const endMin=cur.b%1440;
+  const endH=String(Math.floor(endMin/60)).padStart(2,'0');
+  const endM=String(endMin%60).padStart(2,'0');
 
-    var n = new Date();
-    var nMin = n.getHours()*60 + n.getMinutes() + n.getSeconds()/60;
-    var total = (cur.b - cur.a) * 60 * 1000;
-    var passed = (nMin - cur.a) * 60 * 1000;
-    var remain = Math.max(0, total - passed);
+  title.textContent=`Tid kvar till ${nxt.name} (kl ${endH}:${endM})`;
+  timeEl.textContent=fmt(remain);
+  const pct=total>0?Math.min(100,Math.max(0,(passed/total)*100)):100;
+  fill.style.width=pct+'%';
 
-    var endMin = cur.b % 1440;
-    var endH = z2(Math.floor(endMin/60));
-    var endM = z2(endMin%60);
+  drawTicks(cur.b-cur.a);
 
-    title.textContent = 'Tid kvar till ' + nxt.name + ' (kl ' + endH + ':' + endM + ')';
+  active.textContent=`Nu: ${cur.name}`;
+  nextP.textContent=`Nästa: ${nxt.name} → ${String(Math.floor(nxt.a/60)).padStart(2,'0')}:${String(nxt.a%60).padStart(2,'0')}`;
 
-    timeEl.textContent = fmt(remain);
-    var pct = total>0 ? Math.min(100, Math.max(0, (passed/total)*100)) : 100;
-    fill.style.width = pct + '%';
+  if(remain<=10*60*1000)document.body.classList.add('danger');
+  else document.body.classList.remove('danger');
 
-    drawTicks((cur.b - cur.a));
-
-    active.textContent = 'Nu: ' + cur.name;
-    nextP.textContent  = 'Nästa: ' + nxt.name + ' → ' + z2(Math.floor(nxt.a/60)) + ':' + z2(nxt.a%60);
-
-    if (remain <= 10 * 60 * 1000) { document.body.className = (document.body.className+' danger').trim(); }
-    else { document.body.className = document.body.className.replace(/\bdanger\b/g,'').trim(); }
-
-    if(remain<=1000 && remain>0){
-      for(var i=0;i<5;i++){
-        (function(ii){
-          setTimeout(function(){ beep(120, 1000+ii*60); }, ii*180);
-        })(i);
-      }
-    }
-
-    window.requestAnimationFrame(loop);
+  if(remain<=1000&&remain>0){
+    for(let i=0;i<5;i++)setTimeout(()=>beep(120,1000+i*60),i*180);
   }
 
-  function openSettings(v){ settings.style.display = v? 'block':'none'; }
-  function rowTpl(p,i){
-    return '<div class="row" data-i="'+i+'">'
-         + '<input type="text" value="'+(p.name||'')+'" aria-label="Namn" placeholder="Namn (t.ex. Läggdags)" />'
-         + '<input type="time" value="'+(p.start||'00:00')+'" aria-label="Start" />'
-         + '<input type="time" value="'+(p.end||'00:00')+'" aria-label="Slut" />'
-         + '<button data-del="'+i+'">Ta bort</button>'
-         + '</div>';
-  }
-  function renderRows(){
-    var rows=$('#rows'); var ps=getPeriods();
-    var html='', i; for(i=0;i<ps.length;i++){ html+=rowTpl(ps[i], i); }
-    rows.innerHTML = html;
-  }
-  function saveRows(){
-    var nodes=document.querySelectorAll('.row'); var i, arr=[];
-    for(i=0;i<nodes.length;i++){
-      var r=nodes[i];
-      var inputs=r.querySelectorAll('input');
-      var name=inputs[0].value, start=inputs[1].value, end=inputs[2].value;
-      arr.push({ name: name||'Period', start: start, end: end });
-    }
-    setPeriods(arr); renderRows(); openSettings(false);
-  }
+  requestAnimationFrame(loop);
+}
 
-  $('#openSettings').addEventListener('click', function(){ renderRows(); openSettings(true); });
-  var touchTimer=null;
-  document.addEventListener('touchstart', function(){ touchTimer=setTimeout(function(){ renderRows(); openSettings(true); }, 650); }, {passive:true});
-  document.addEventListener('touchend', function(){ if(touchTimer){ clearTimeout(touchTimer); touchTimer=null; }}, {passive:true});
-
-  $('#close').addEventListener('click', function(){ openSettings(false); });
-  $('#save').addEventListener('click', saveRows);
-  $('#add').addEventListener('click', function(){
-    var ps=getPeriods(); ps.push({name:"Ny period", start:"12:00", end:"13:00"}); setPeriods(ps); renderRows();
+/* Inställnings-UI */
+function openSettings(v=true){ settings.style.display=v?'block':'none'; }
+function rowTpl(p,i){
+  return `<div class="row" data-i="${i}">
+    <input type="text" value="${p.name}" placeholder="Namn" />
+    <input type="time" value="${p.start}" />
+    <input type="time" value="${p.end}" />
+    <button data-del="${i}">Ta bort</button>
+  </div>`;
+}
+function renderRows(){
+  const rows=$('#rows');
+  const ps=getPeriods();
+  rows.innerHTML=ps.map((p,i)=>rowTpl(p,i)).join('');
+}
+function saveRows(){
+  const rows=[...document.querySelectorAll('.row')];
+  const arr=rows.map(r=>{
+    const [name,start,end]=[...r.querySelectorAll('input')].map(x=>x.value);
+    return{name:name||'Period',start,end};
   });
-  settings.addEventListener('click', function(e){
-    var t=e.target; while(t && t!==settings && !(t.getAttribute && t.getAttribute('data-del'))){ t=t.parentNode; }
-    if(t && t.getAttribute && t.getAttribute('data-del')){
-      var i=parseInt(t.getAttribute('data-del'),10);
-      var ps=getPeriods(); ps.splice(i,1); setPeriods(ps); renderRows();
-    }
-  });
+  setPeriods(arr);renderRows();openSettings(false);
+}
 
-  document.addEventListener('dblclick', function(){
-    var el=document.documentElement; if(el.requestFullscreen) el.requestFullscreen();
-  });
-
-  loop();
-})();
+$('#openSettings').addEventListener('click',()=>{renderRows();openSettings(true);});
+let touchTimer=null;
+document.addEventListener('touchstart',()=>{touchTimer=setTimeout(()=>{renderRows();openSettings(true);},650);},{passive:true});
+document.addEventListener('touchend',()=>{if(touchTimer){clearTimeout(touchTimer);touchTimer=null;}},{passive:true});
+$('#close').addEventListener('click',()=>openSettings(false));
+$('#save').addEventListener('click',saveRows);
+$('#add').addEventListener('click',()=>{
+  const ps=getPeriods();ps.push({name:"Ny period",start:"12:00",end:"13:00"});setPeriods(ps);renderRows();
+});
+settings.addEventListener('click',e=>{
+  const btn=e.target.closest('button[data-del]');if(!btn)return;
+  const i=+btn.dataset.del;const ps=getPeriods();ps.splice(i,1);setPeriods(ps);renderRows();
+});
+document.addEventListener('dblclick',()=>{
+  const el=document.documentElement;if(el.requestFullscreen)el.requestFullscreen();
+});
+loop();
 </script>
 </body>
 </html>
