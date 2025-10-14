@@ -1,110 +1,57 @@
 <!DOCTYPE html>
 <html lang="sv">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Väggtimer</title>
+<meta name="viewport"
+  content="width=device-width, initial-scale=1, viewport-fit=cover, shrink-to-fit=no">
 <style>
+  /* 1) Gör text och komponenter proportionerliga på surfplattor */
   :root{
-    --pad: max(8px, 2vh);
-    --radius: 20px;
-    --touch: 48px;
+    /* Bas i rem som följer minsta av bredd/höjd, men aldrig för liten/stor */
+    font-size: clamp(14px, min(2.8vw, 3.2vh), 28px);
+    --pad: max(0.5rem, 2svh);     /* ersätt 8px/2vh med rem/svh */
+    --radius: 1.25rem;
+    --touch: 3rem;                 /* ~48px touch-minimum, men responsivt */
   }
-  html,body{height:100%}
-  body{
+
+  /* 2) Hindra webkit/Android från att krympa text konstigt */
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body {
     margin:0;
-    font-family: ui-sans-serif, system-ui, -apple-system,"Segoe UI",Roboto,Helvetica,Arial;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial;
     color:#fff;
-    background:#000;           /* helsvart som standard */
+    background:#000;
+    /* 3) Använd nya viewport-enheter som funkar bättre med mobila adressfält */
+    height: 100svh;          /* “small viewport height” */
+    min-height: 100svh;
     overflow:hidden;
     transition: background .25s ease;
   }
-  body.danger{                 /* 3) röd bakgrund vid ≤ 10 min kvar */
-    background:#8b0000;
+
+  /* fallback för äldre webview om svh saknas */
+  @supports not (height: 100svh) {
+    body { height: 100vh; min-height: 100vh; }
   }
 
-  .wrap{position:relative; height:100%; width:100%; display:grid; place-items:center; padding: var(--pad);}
-  .stage{
-    width:100%; height:100%;
-    border-radius:0;
-    padding: clamp(8px, 2.2vh, 28px);
-    box-sizing:border-box;
-    display:grid;
-    grid-template-rows: auto 1fr auto auto;
-    gap: clamp(6px, 1.6vh, 16px);
+  /* Exempel: gör stora siffror som skalar snyggt på platta */
+  .timer {
+    font-variant-numeric: tabular-nums lining-nums;
+    font-weight: 700;
+    /* 4) Skala text efter bredd/höjd – blir stort på platta, inte pyttigt */
+    font-size: clamp(2rem, 10vmin, 8rem);
+    line-height: 1;
+    letter-spacing: 0.04em;
   }
 
-  .title{
-    text-align:center; font-weight:800; letter-spacing:.3px; opacity:.95;
-    font-size: clamp(14px, 3.4vh, 26px);
-  }
-  .time{
-    display:grid; place-items:center;
-    text-align:center; font-weight:900; line-height:1.0; letter-spacing:.4px;
-    font-size: clamp(56px, 22vh, 320px);
-    margin-bottom: max(4px, .5vh);
-    white-space:nowrap;
+  /* Knappar/ytor får rimliga touch-mått */
+  .btn {
+    min-height: var(--touch);
+    min-width: calc(var(--touch) * 2);
+    padding: 0 1rem;
+    border-radius: var(--radius);
   }
 
-  /* 1) Ljusgrå bar-bakgrund */
-  .bar{
-    position:relative;
-    height: clamp(14px, 3.2vh, 36px);
-    background:#e6e6e6;
-    border-radius:999px;
-    overflow:hidden;
-  }
-  .fill{
-    position:absolute; inset:0 auto 0 0; width:0%;
-    background: linear-gradient(90deg, #fff, #dcdcdc);
-    border-radius:inherit;
-  }
-
-  .ticks{ position:relative; height: clamp(22px, 4.2vh, 40px);}
-  .tick{ position:absolute; top:0; transform:translateX(-50%); text-align:center; }
-  .tick i{ display:block; width:2px; height: clamp(10px, 2vh, 18px); background:rgba(255,255,255,.95); margin:0 auto 6px; border-radius:2px; }
-  .tick span{ font-size: clamp(10px, 2vh, 14px); opacity:.95;}
-  .tick.end i{ width:3px; height: clamp(14px, 2.6vh, 24px); background:#ffffff; } /* markera slutet extra tydligt */
-  .tick.end span{ font-weight:800; }
-
-  .footer{
-    display:flex; justify-content:space-between; align-items:center; gap:12px;
-    font-weight:600; opacity:.95;
-    font-size: clamp(12px, 2.2vh, 18px);
-  }
-  .pills{ display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
-  .pill{
-    padding:.35em .8em; background:#121212; border:1px solid #2a2a2a; border-radius:999px;
-  }
-
-  .fab{
-    position:absolute;
-    right: clamp(8px, 2vh, 16px);
-    bottom: clamp(8px, 2vh, 16px);
-    width: max(var(--touch), 5.8vh); height: max(var(--touch), 5.8vh);
-    border-radius:999px; display:grid; place-items:center;
-    background:#151515; color:#fff; border:1px solid #2a2a2a;
-    font-size: clamp(16px, 2.4vh, 20px);
-    user-select:none; cursor:pointer; touch-action:manipulation;
-  }
-
-  .settings{
-    position:absolute; inset:0; background:rgba(0,0,0,.94);
-    border:none; padding:clamp(10px, 3vh, 28px); display:none; overflow:auto;
-  }
-  .settings h2{margin:.2em 0 .6em; font-size: clamp(16px, 3vh, 28px);}
-  .row{display:grid; grid-template-columns: 1.2fr 1fr 1fr auto; gap:10px; align-items:center; margin:.5em 0;}
-  .row input{ padding:.8em .9em; border-radius:12px; border:1px solid #2a2a2a; background:#0d0d0d; color:#fff; font-size: clamp(14px, 2.2vh, 18px);}
-  .settings .actions{display:flex; gap:12px; margin-top:10px; flex-wrap:wrap;}
-  .settings button{ padding:.9em 1.1em; min-height: var(--touch); border-radius:12px; border:1px solid #2a2a2a; background:#101010; color:#fff; font-weight:700; cursor:pointer; font-size: clamp(14px, 2.2vh, 18px);}
-
-  @media (orientation: landscape){
-    .stage{ grid-template-rows: auto 1fr auto auto; gap: clamp(4px, 1.2vh, 12px); }
-    .time{ font-size: clamp(56px, 26vh, 360px); }
-    .bar{ height: clamp(12px, 2.6vh, 30px); }
-  }
+  /* Behåll dina färg- och statusklasser som tidigare */
+  body.danger { background:#8b0000; }
 </style>
-</head>
 <body>
   <div class="wrap">
     <div class="stage" id="stage">
