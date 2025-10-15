@@ -7,17 +7,17 @@
 <style>
   :root{
     /* Typo */
-    --fs-title: 2rem;
-    --fs-subtitle: 1.1rem;
-    --fs-time: 120px;
+    --fs-time: 240px;    /* DUBBEL storlek för nedräknaren */
+    --fs-title: 240px;   /* Samma storlek på “Tid kvar” + “Nästa” */
+    --fs-subtitle: 240px;
 
     /* Färger */
-    --meter-bg: #226EB1;  /* ofylld del (hela bakgrunden) */
-    --meter-fill: #FF8811;/* fylld del */
+    --meter-bg: #226EB1;   /* ofylld del (hela bakgrunden) */
+    --meter-fill: #FF8811; /* fylld del */
 
     /* UI */
     --pad: 16px;
-    --tick-w: 3px;
+    --tick-w: 4px;     /* lite tjockare streck */
   }
 
   html,body{
@@ -28,7 +28,7 @@
 
   /* HELA skärmen = mätaren */
   #meter{
-    position:fixed; left:0; top:0; right:0; bottom:0;
+    position:fixed; inset:0;
     background: var(--meter-bg);
     -webkit-tap-highlight-color: transparent;
   }
@@ -37,38 +37,46 @@
     position:absolute; left:0; top:0; bottom:0; width:0%;
     background: var(--meter-fill);
     transform: translateZ(0);
+    z-index: 1;
   }
 
-  /* Vertikala tidsstreck över hela höjden */
+  /* Vertikala tidsstreck över hela höjden – nu med tydlig z-index */
   #ticks{
     position:absolute; inset:0;
-    pointer-events:none; /* låt klick gå igenom */
+    pointer-events:none;
+    z-index: 5; /* ovanpå fyllnaden */
   }
   .tick{
     position:absolute; top:0; bottom:0; width: var(--tick-w);
     margin-left: calc(var(--tick-w) * -0.5);
-    background: rgba(255,255,255,.85);
+    background: rgba(255,255,255,0.95);
     border-radius:2px;
   }
-  .tick.end{ width:4px; background:#fff; }
+  .tick.end{ width:6px; background:#fff; }
 
-  /* Etikett under varje streck (precis ovanför nederkant, högerjusterad) */
+  /* Etikett under varje streck */
   .tick-label{
-    position:absolute; bottom: calc(var(--pad) + 6px);
-    right: -8px; /* flytta lite så texten inte krockar med strecket */
-    font-size: 1rem; font-weight: 800; white-space:nowrap;
-    text-shadow: 0 2px 4px rgba(0,0,0,.35);
+    position:absolute; bottom: calc(var(--pad) + 8px);
+    right: -8px;
+    font-size: 22px; font-weight: 900; white-space:nowrap;
+    text-shadow: 0 2px 4px rgba(0,0,0,.6);
   }
 
-  /* Overlays för text (högerkant) */
-  #topRight{
-    position:absolute; right: var(--pad); top: var(--pad);
-    text-align:right; z-index:10; line-height:1.15;
+  /* Overlays */
+  /* Nedre VÄNSTER: “Tid kvar” + “Nästa” – lika stora som nedräknaren */
+  #bottomLeft{
+    position:absolute; left: var(--pad); bottom: var(--pad);
+    text-align:left; z-index:10; line-height:1; max-width: 90%;
     text-shadow: 0 2px 6px rgba(0,0,0,.45);
   }
-  #title{ font-size: var(--fs-title); font-weight:900; letter-spacing:.3px; }
-  #subtitle{ font-size: var(--fs-subtitle); font-weight:700; opacity:.96; margin-top:6px; }
+  #title{
+    font-size: var(--fs-title); font-weight:900; letter-spacing:.3px;
+  }
+  #subtitle{
+    font-size: var(--fs-subtitle); font-weight:900; opacity:.98; margin-top:8px;
+  }
 
+  /* Nedre HÖGER: nedräknaren (dubbelt så stor) */
   #bottomRight{
     position:absolute; right: var(--pad); bottom: var(--pad);
     text-align:right; z-index:10; text-shadow: 0 2px 6px rgba(0,0,0,.45);
@@ -78,7 +86,7 @@
     white-space:nowrap;
   }
 
-  /* Liten FAB för inställningar, diskret */
+  /* Liten FAB för inställningar */
   .fab{
     position:absolute; left: var(--pad); top: var(--pad);
     width:56px; height:56px; z-index:12;
@@ -113,11 +121,13 @@
     <div id="fill"></div>
     <div id="ticks"></div>
 
-    <div id="topRight">
+    <!-- Nedre vänster: Tid kvar + Nästa (lika stora som nedräknaren) -->
+    <div id="bottomLeft">
       <div id="title">Tid kvar</div>
       <div id="subtitle">–</div>
     </div>
 
+    <!-- Nedre höger: Nedräknaren -->
     <div id="bottomRight">
       <div id="time">--</div>
     </div>
@@ -171,7 +181,7 @@ function fmt(ms){
   return h+'h '+m+'m '+pad2(s)+'s';
 }
 
-/* --- Splitta över midnatt & välj period (Chrome/WebView 59-vänligt) --- */
+/* --- Splitta över midnatt & välj period (WebView 59-vänligt) --- */
 function expand(ps){
   var out=[];
   for(var i=0;i<ps.length;i++){
@@ -225,12 +235,11 @@ function drawTicks(totalMin){
     var t = document.createElement('div');
     t.className = 'tick';
     t.style.left = pct + '%';
-    ticks.appendChild(t);
-
     var lab = document.createElement('div');
     lab.className = 'tick-label';
     lab.textContent = fmtTick(at);
     t.appendChild(lab);
+    ticks.appendChild(t);
   }
   var end = document.createElement('div');
   end.className = 'tick end';
