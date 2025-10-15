@@ -2,329 +2,60 @@
 <html lang="sv">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport"
-      content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
-<meta name="HandheldFriendly" content="true">
-<meta name="MobileOptimized" content="width">
-<title>Väggtimer</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>Väggtimer – felsäker skalning</title>
 <style>
-  :root{
-    --pad: 16px;
-    --radius: 20px;
-    --touch: 48px;
-    /* Basstorlek för klockan i "design-space" 1280×800.
-       Allt skalas sedan via JS-transform, så denna behöver inte vara dynamisk. */
-    --fs-time: 220px;
-  }
-
-  /* Hindra “wide viewport/overview” från att krympa allt i gamla webviews */
-  @media screen and (min-device-width: 0px) {
-    html, body { max-width: 100%; }
-  }
-
-  html,body{height:100%}
-  body{
-    margin:0;
-    font-family: ui-sans-serif, system-ui, -apple-system,"Segoe UI",Roboto,Helvetica,Arial;
-    color:#fff;
-    background:#000;
-    overflow:hidden;
-    -webkit-text-size-adjust:100%;
-    text-size-adjust:100%;
-    -webkit-font-smoothing:antialiased;
-    text-rendering:optimizeLegibility;
-    transition: background .25s ease;
-  }
-  body.danger{ background:#8b0000; }
-
-  /* === SCEN-SKALNING (fix för Fully/WebView 59) ===
-     .fit fyller hela skärmen; #stage är fast 1280×800 och skalas/positioneras med JS. */
-  .fit{
-    position:fixed;
-    inset:0;
-    overflow:hidden;
-    touch-action:manipulation;
-    -ms-content-zooming:none;
-  }
+  html,body{margin:0;height:100%;background:#111;color:#fff;overflow:hidden;font-family:sans-serif;}
   #stage{
-    position:absolute;            /* vi flyttar & skalar den via JS */
-    width:1280px;                 /* DESIGN-BREDD */
-    height:800px;                 /* DESIGN-HÖJD  */
-    box-sizing:border-box;
-    padding:20px;
-    display:grid;
-    grid-template-rows:auto 1fr auto auto;
-    gap:12px;
-    transform-origin:0 0;         /* viktigt för korrekt skalning från toppen-vänster */
-    will-change:transform;
-    backface-visibility:hidden;
-  }
-
-  /* Typografi i design-space. Skalas av scen-transformen, inte av viewporten. */
-  html { font-size: 16px; }
-  .title{ text-align:center; font-weight:800; font-size:1.5rem; letter-spacing:.3px; opacity:.95; }
-  .time { display:grid; place-items:center; text-align:center; font-weight:900;
-          line-height:1; letter-spacing:.4px; font-size: var(--fs-time); white-space:nowrap; margin-bottom:8px; }
-  .footer{ display:flex; justify-content:space-between; align-items:center; gap:12px; font-weight:600; opacity:.95; font-size:1rem; }
-
-  .bar{ position:relative; height:24px; background:#e6e6e6; border-radius:999px; overflow:hidden; }
-  .fill{ position:absolute; inset:0 auto 0 0; width:0%; background:linear-gradient(90deg,#fff,#dcdcdc); border-radius:inherit; }
-
-  .ticks{ position:relative; height:34px;}
-  .tick{ position:absolute; top:0; transform:translateX(-50%); text-align:center; }
-  .tick i{ display:block; width:2px; height:16px; background:rgba(255,255,255,.95); margin:0 auto 6px; border-radius:2px; }
-  .tick span{ font-size:.875rem; opacity:.95; }
-  .tick.end i{ width:3px; height:22px; background:#fff; }
-  .tick.end span{ font-weight:800; }
-
-  .pills{ display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
-  .pill{ padding:.35em .8em; background:#121212; border:1px solid #2a2a2a; border-radius:999px; }
-
-  .fab{
     position:absolute;
-    right:16px; bottom:16px;
-    width:64px; height:64px;
-    border-radius:999px; display:grid; place-items:center;
-    background:#151515; color:#fff; border:1px solid #2a2a2a;
-    font-size:18px;
-    user-select:none; cursor:pointer; touch-action:manipulation;
+    width:1280px;
+    height:800px;
+    left:0; top:0;
+    background:#222; /* syns alltid, bara för debug */
+    display:grid;
+    place-items:center;
+    transform-origin:0 0;
+    color:white;
   }
-
-  .settings{
-    position:absolute; inset:0; background:rgba(0,0,0,.94);
-    border:none; padding:20px; display:none; overflow:auto;
-  }
-  .settings h2{margin:.2em 0 .6em; font-size:1.375rem;}
-  .row{display:grid; grid-template-columns:1.2fr 1fr 1fr auto; gap:10px; align-items:center; margin:.5em 0;}
-  .row input{ padding:.8em .9em; border-radius:12px; border:1px solid #2a2a2a; background:#0d0d0d; color:#fff; font-size:1rem;}
-  .settings .actions{display:flex; gap:12px; margin-top:10px; flex-wrap:wrap;}
-  .settings button{ padding:.9em 1.1em; min-height:48px; border-radius:12px; border:1px solid #2a2a2a; background:#101010; color:#fff; font-weight:700; cursor:pointer; font-size:1rem;}
+  #time{font-size:200px;font-weight:900;}
 </style>
 </head>
 <body>
-  <div class="fit" id="fit">
-    <div class="stage" id="stage">
-      <div class="title" id="title">Tid kvar</div>
-      <div class="time" id="time">--</div>
-
-      <div class="bar" id="bar"><div class="fill" id="fill"></div></div>
-      <div class="ticks" id="ticks"></div>
-
-      <div class="footer">
-        <div class="pills">
-          <div class="pill" id="activePeriod">–</div>
-          <div class="pill" id="nextPeriod">–</div>
-        </div>
-      </div>
-
-      <div class="fab" id="openSettings" aria-label="Inställningar">⚙︎</div>
-
-      <div class="settings" id="settings">
-        <h2>Perioder</h2>
-        <p>Lägg till tidsperioder för dygnet. Timern väljer automatiskt den period som matchar klockslaget och räknar ner till periodens slut.</p>
-        <div id="rows"></div>
-        <div class="actions">
-          <button id="add">+ Lägg till period</button>
-          <button id="save">Spara</button>
-          <button id="close">Stäng</button>
-        </div>
-        <p><small>Tips: Kör i helskärm. Allt sparas lokalt i webbläsaren.</small></p>
-      </div>
-    </div>
-  </div>
-
+<div id="stage">
+  <div id="time">LOADING…</div>
+</div>
 <script>
-/* --- Snabb $ --- */
-const $ = s=>document.querySelector(s);
-
-/* --- Element --- */
-const title=$('#title'), timeEl=$('#time'), fill=$('#fill'), ticks=$('#ticks');
-const active=$('#activePeriod'), nextP=$('#nextPeriod'), settings=$('#settings');
-const stage=$('#stage');
-
-/* --- Perioddata --- */
-const DEFAULT_PERIODS = [
-  { name:"Morgon",     start:"07:00", end:"09:00" },
-  { name:"Arbetstid",  start:"09:00", end:"17:00" },
-  { name:"Kväll",      start:"17:00", end:"22:30" },
-  { name:"Läggdags",   start:"22:30", end:"23:59" },
-  { name:"Natt",       start:"00:00", end:"07:00" },
-];
-
-function getPeriods(){ try{ const r=localStorage.getItem('walltimer.periods'); const arr=r?JSON.parse(r):DEFAULT_PERIODS; return (Array.isArray(arr)&&arr.length)?arr:DEFAULT_PERIODS; }catch{ return DEFAULT_PERIODS; } }
-function setPeriods(p){ localStorage.setItem('walltimer.periods', JSON.stringify(p)); }
-
-/* --- Hjälp --- */
-function t2m(t){ const [h,m]=t.split(':').map(Number); return (h%24)*60+(m||0); }
-function nowMin(){ const n=new Date(); return n.getHours()*60+n.getMinutes()+n.getSeconds()/60; }
-function fmt(ms){ let s=Math.max(0, Math.floor(ms/1000)); const h=Math.floor(s/3600); s-=h*3600; const m=Math.floor(s/60); s-=m*60; return `${h}h ${m}m ${String(s).padStart(2,'0')}s`; }
-
-/* --- Splitta över midnatt och välj period --- */
-function expand(ps){
-  const out=[];
-  for(const p of ps){
-    const a=t2m(p.start), b=t2m(p.end);
-    if(b>=a){ out.push({...p,a,b}); }
-    else { out.push({...p,a,b:1440}); out.push({...p,name:p.name,a:0,b}); }
-  }
-  return out.sort((x,y)=>x.a-y.a);
-}
-function pick(ps){
-  const n=nowMin(), list=expand(ps);
-  let cur=null, nxt=null;
-  for(let i=0;i<list.length;i++){
-    const p=list[i];
-    if(n>=p.a && n<p.b){ cur=p; nxt=list[(i+1)%list.length]; break; }
-  }
-  if(!cur){
-    nxt = list.find(p=>p.a>n) || list[0];
-    cur = { name:"Paus", a:n, b:nxt.a };
-  }
-  return {cur, nxt};
-}
-
-/* --- Ticks --- */
-function chooseTickStep(totalMin){
-  if (totalMin <= 120) return 30;
-  if (totalMin <= 480) return 60;
-  return 120;
-}
-function fmtTick(mins){
-  if (mins % 60 === 0) return `${mins/60}h`;
-  return `${mins%60}m`;
-}
-function drawTicks(totalMin){
-  ticks.innerHTML='';
-  const step = chooseTickStep(totalMin);
-  for(let at=0; at<=totalMin; at+=step){
-    const left = (at/totalMin)*100;
-    const div = document.createElement('div');
-    div.className='tick';
-    div.style.left = left+'%';
-    div.innerHTML = `<i></i><span>${fmtTick(at)}</span>`;
-    ticks.appendChild(div);
-  }
-  const end = document.createElement('div');
-  end.className = 'tick end';
-  end.style.left = '100%';
-  end.innerHTML = `<i></i><span>slut</span>`;
-  ticks.appendChild(end);
-}
-
-/* --- Ljudpip vid slut --- */
-let audioCtx;
-function beep(ms=200, freq=880){
-  try{
-    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
-    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-    o.connect(g); g.connect(audioCtx.destination);
-    o.type='sine'; o.frequency.value=freq; g.gain.value=.05; o.start();
-    setTimeout(()=>o.stop(), ms);
-  }catch(e){}
-}
-
-/* === SCEN-SKALNING ===
-   Skala en fast 1280×800-layout till faktisk viewport utan att använda vh/clamp/zoom. */
-const BASE_W = 1280;
-const BASE_H = 800;
+const stage=document.getElementById('stage');
+const timeEl=document.getElementById('time');
 
 function applyScale(){
-  // Faktisk viewport (ta höjd för gamla WebView-mått)
-  const ww = Math.max(320, window.innerWidth  || document.documentElement.clientWidth  || 0);
-  const wh = Math.max(320, window.innerHeight || document.documentElement.clientHeight || 0);
+  // skydd mot gamla WebView som rapporterar 0
+  const ww=Math.max(100, window.innerWidth  || document.documentElement.clientWidth  || 0);
+  const wh=Math.max(100, window.innerHeight || document.documentElement.clientHeight || 0);
+  const BASE_W=1280, BASE_H=800;
 
-  // Proportionerlig skala
-  let s = Math.min(ww / BASE_W, wh / BASE_H);
-  // Liten avrundning för att minska text-blurr (men behåll flyt)
-  s = Math.max(0.1, Math.min(4, s));
-  const sStr = s.toFixed(4);
+  let s=Math.min(ww/BASE_W, wh/BASE_H);
+  s=Math.max(0.1,Math.min(4,s));
 
-  // Centrera scenen
-  const x = Math.round((ww - BASE_W * s) / 2);
-  const y = Math.round((wh - BASE_H * s) / 2);
+  const x=(ww-BASE_W*s)/2;
+  const y=(wh-BASE_H*s)/2;
 
-  // Applicera transform – allt inuti #stage följer med
-  stage.style.transform = `translate(${x}px, ${y}px) scale(${sStr})`;
+  stage.style.transform=`translate(${x}px,${y}px) scale(${s})`;
+
+  // Visa lite info för felsökning
+  console.log('applyScale()', {ww,wh,s,x,y});
 }
 
-window.addEventListener('resize', applyScale);
-window.addEventListener('orientationchange', applyScale);
+window.addEventListener('resize',applyScale);
+window.addEventListener('orientationchange',applyScale);
 
-/* --- Huvudloop --- */
 function loop(){
-  const ps=getPeriods();
-  const {cur, nxt} = pick(ps);
-  const n = new Date();
-  const nMin = n.getHours()*60 + n.getMinutes() + n.getSeconds()/60;
-  const total = (cur.b - cur.a) * 60 * 1000;
-  const passed = (nMin - cur.a) * 60 * 1000;
-  const remain = Math.max(0, total - passed);
-
-  const endMin = cur.b % 1440;
-  const endH = String(Math.floor(endMin/60)).padStart(2,'0');
-  const endM = String(endMin%60).padStart(2,'0');
-
-  title.textContent = `Tid kvar till ${nxt.name} (kl ${endH}:${endM})`;
-  timeEl.textContent = fmt(remain);
-
-  const pct = total>0 ? Math.min(100, Math.max(0, (passed/total)*100)) : 100;
-  fill.style.width = pct + '%';
-
-  drawTicks((cur.b - cur.a));
-
-  active.textContent = `Nu: ${cur.name}`;
-  nextP.textContent   = `Nästa: ${nxt.name} → ${String(Math.floor(nxt.a/60)).padStart(2,'0')}:${String(nxt.a%60).padStart(2,'0')}`;
-
-  if (remain <= 10 * 60 * 1000) { document.body.classList.add('danger'); }
-  else { document.body.classList.remove('danger'); }
-
-  if(remain<=1000 && remain>0){
-    for(let i=0;i<5;i++) setTimeout(()=>beep(120, 1000+i*60), i*180);
-  }
-
+  const n=new Date();
+  const t=n.toLocaleTimeString('sv-SE');
+  timeEl.textContent=t;
   requestAnimationFrame(loop);
 }
 
-/* --- Inställnings-UI --- */
-function openSettings(v=true){ settings.style.display = v? 'block':'none'; }
-function rowTpl(p,i){
-  return `<div class="row" data-i="${i}">
-    <input type="text" value="${p.name}" aria-label="Namn" placeholder="Namn (t.ex. Läggdags)" />
-    <input type="time" value="${p.start}" aria-label="Start" />
-    <input type="time" value="${p.end}" aria-label="Slut" />
-    <button data-del="${i}">Ta bort</button>
-  </div>`;
-}
-function renderRows(){ const rows=$('#rows'); const ps=getPeriods(); rows.innerHTML = ps.map((p,i)=>rowTpl(p,i)).join(''); }
-function saveRows(){
-  const rows=[...document.querySelectorAll('.row')];
-  const arr = rows.map(r=>{
-    const [name,start,end]=[...r.querySelectorAll('input')].map(x=>x.value);
-    return { name: name||'Period', start, end };
-  });
-  setPeriods(arr); renderRows(); openSettings(false);
-}
-
-$('#openSettings').addEventListener('click', ()=>{ renderRows(); openSettings(true); });
-let touchTimer=null;
-document.addEventListener('touchstart', ()=>{ touchTimer=setTimeout(()=>{ renderRows(); openSettings(true); }, 650); }, {passive:true});
-document.addEventListener('touchend', ()=>{ if(touchTimer){ clearTimeout(touchTimer); touchTimer=null; }}, {passive:true});
-
-$('#close').addEventListener('click', ()=> openSettings(false));
-$('#save').addEventListener('click', saveRows);
-$('#add').addEventListener('click', ()=>{
-  const ps=getPeriods(); ps.push({name:"Ny period", start:"12:00", end:"13:00"}); setPeriods(ps); renderRows();
-});
-settings.addEventListener('click', (e)=>{
-  const btn=e.target.closest('button[data-del]'); if(!btn) return;
-  const i=+btn.dataset.del; const ps=getPeriods(); ps.splice(i,1); setPeriods(ps); renderRows();
-});
-
-document.addEventListener('dblclick', ()=>{
-  const el=document.documentElement; if(el.requestFullscreen) el.requestFullscreen();
-});
-
-/* --- Start --- */
 applyScale();
 loop();
 </script>
