@@ -142,7 +142,7 @@ var $ = function(s){ return document.querySelector(s); };
 var title=$('#title'), subtitle=$('#subtitle'), timeEl=$('#time'), fill=$('#fill'), ticks=$('#ticks');
 var settings=$('#settings'), stage=$('#stage'), track=$('#track');
 
-/* --- Perioddata (implementerar dina tider) --- */
+/* --- Perioddata (dina tider) --- */
 var DEFAULT_PERIODS = [
   { name:"Morgon",      start:"06:30", end:"08:00" },
   { name:"Förmiddag",   start:"08:00", end:"12:00" },
@@ -153,17 +153,46 @@ var DEFAULT_PERIODS = [
   { name:"Natt",        start:"22:30", end:"06:30" }
 ];
 
+/* --- LocalStorage helpers --- */
 function getPeriods(){
   try{
     var r=localStorage.getItem('walltimer.periods');
     var arr=r?JSON.parse(r):DEFAULT_PERIODS;
-    return (Object.prototype.toString.call(arr)==='[object Array]' && arr.length)?arr:DEFAULT_PERIODS;
-  }catch(e){ return DEFAULT_PERIODS; }
+    if (Object.prototype.toString.call(arr)!=='[object Array]' || !arr.length) arr = DEFAULT_PERIODS;
+    /* normalisera allt vi läser */
+    return arr.map(function(p){
+      return { name: String(p.name||'Period'),
+               start: normalizeTime(p.start),
+               end:   normalizeTime(p.end) };
+    });
+  }catch(e){
+    return DEFAULT_PERIODS.slice();
+  }
 }
 function setPeriods(p){ localStorage.setItem('walltimer.periods', JSON.stringify(p)); }
 
-/* --- Hjälp --- */
-function t2m(t){ var parts=t.split(':'), h=+parts[0], m=+parts[1]||0; return (h%24)*60+m; }
+/* --- Tidshjälp --- */
+/* Accepterar "06:30", "06.30", "0630", "6 30", "6-30" etc → "06:30" */
+function normalizeTime(v){
+  if (v == null) return "00:00";
+  v = String(v).trim();
+  v = v.replace(/[.,;\-\s]+/g, ':');   // ersätt punkt, komma, mellanslag, minus → kolon
+  // tillåt "0630" → "06:30"
+  var m = v.match(/^(\d{1,2})(?::?(\d{1,2}))?/);
+  var h = m && m[1] != null ? parseInt(m[1],10) : 0;
+  var mi = m && m[2] != null ? parseInt(m[2],10) : 0;
+  if (isNaN(h)) h = 0;
+  if (isNaN(mi)) mi = 0;
+  h = Math.max(0, Math.min(23, h));
+  mi = Math.max(0, Math.min(59, mi));
+  return (h<10?'0':'')+h+':' + (mi<10?'0':'')+mi;
+}
+function t2m(t){
+  var n = normalizeTime(t);
+  var parts = n.split(':');
+  var h = +parts[0], m = +parts[1]||0;
+  return (h%24)*60 + m;
+}
 function nowMin(){ var n=new Date(); return n.getHours()*60+n.getMinutes()+n.getSeconds()/60; }
 function pad2(x){ return (x<10?'0':'')+x; }
 function fmt(ms){
@@ -178,14 +207,19 @@ function expand(ps){
   var out=[];
   for(var i=0;i<ps.length;i++){
     var p=ps[i], a=t2m(p.start), b=t2m(p.end);
-    if(b>=a){
-      out.push(Object.assign({}, p, {a:a, b:b}));
+    if (b>=a){
+      out.push({ name:p.name, start:p.start, end:p.end, a:a, b:b });
     }else{
-      out.push(Object.assign({}, p, {a:a, b:1440}));
-      out.push(Object.assign({}, p, {a:0,  b:b}));
+      /* över midnatt: skapa två segment */
+      out.push({ name:p.name, start:p.start, end:"24:00", a:a, b:1440 });
+      out.push({ name:p.name, start:"00:00", end:p.end, a:0, b:b });
     }
   }
-  out.sort(function(x,y){ return x.a - y.a; });
+  out.sort(function(x,y){
+    var ax = isNaN(x.a)? 99999 : x.a;
+    var ay = isNaN(y.a)? 99999 : y.a;
+    return ax - ay;
+  });
   return out;
 }
 function pick(ps){
@@ -196,13 +230,16 @@ function pick(ps){
     if(n>=p.a && n<p.b){ cur=p; nxt=list[(i+1)%list.length]; break; }
   }
   if(!cur){
+    /* om NaN smugit sig in någonstans, välj första vettiga framtida period */
     nxt = (function(){
-      for(var j=0;j<list.length;j++){ if(list[j].a>n) return list[j]; }
+      for(var j=0;j<list.length;j++){
+        if(!isNaN(list[j].a) && list[j].a>n) return list[j];
+      }
       return list[0];
     })();
-    cur = { name:"Paus", a:n, b:nxt.a };
+    cur = { name:"Paus", a:n, b:nxt && !isNaN(nxt.a) ? nxt.a : n };
   }
-  return {cur:cur, nxt:nxt};
+  return {cur:cur, nxt:nxt||list[0]};
 }
 
 /* --- Ticks --- */
@@ -218,7 +255,6 @@ function fmtTick(mins){
 function drawTicks(totalMin){
   ticks.innerHTML='';
   var step = chooseTickStep(totalMin);
-  /* rita ej tick vid exakt totalMin (reserv för "slut") */
   for(var at=0; at<totalMin; at+=step){
     var left = (at/totalMin)*100;
     var div = document.createElement('div');
@@ -324,8 +360,8 @@ function openSettings(v){ settings.style.display = (v===false)? 'none':'block'; 
 function rowTpl(p,i){
   return '<div class="row" data-i="'+i+'">'+
     '<input type="text" value="'+p.name+'" aria-label="Namn" placeholder="Namn (t.ex. Läggdags)" />'+
-    '<input type="time" value="'+p.start+'" aria-label="Start" />'+
-    '<input type="time" value="'+p.end+'" aria-label="Slut" />'+
+    '<input type="time" value="'+normalizeTime(p.start)+'" aria-label="Start" />'+
+    '<input type="time" value="'+normalizeTime(p.end)+'" aria-label="Slut" />'+
     '<button data-del="'+i+'">Ta bort</button>'+
   '</div>';
 }
@@ -338,7 +374,9 @@ function saveRows(){
   var rowEls=[].slice.call(document.querySelectorAll('.row'));
   var arr = rowEls.map(function(r){
     var ins=[].slice.call(r.querySelectorAll('input'));
-    var name=ins[0].value, start=ins[1].value, end=ins[2].value;
+    var name=ins[0].value;
+    var start=normalizeTime(ins[1].value);
+    var end  =normalizeTime(ins[2].value);
     return { name: name||'Period', start: start, end: end };
   });
   setPeriods(arr); renderRows(); openSettings(false);
@@ -366,8 +404,12 @@ $('#add').addEventListener('click', function(){
 });
 $('#reset').addEventListener('click', function(){
   if (confirm('Återställ perioderna till standard? Dina egna ändringar ersätts.')) {
-    setPeriods(DEFAULT_PERIODS);
-    renderRows();
+    var fresh = DEFAULT_PERIODS.map(function(p){
+      return { name:p.name, start:normalizeTime(p.start), end:normalizeTime(p.end) };
+    });
+    setPeriods(fresh);
+    renderRows();     // uppdatera tabellen
+    openSettings(false); // stäng rutan
   }
 });
 
