@@ -3,36 +3,40 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
-<title>Väggtimer – skalad scen (matchad bar)</title>
+<title>Väggtimer – baren i fokus</title>
 <style>
   :root{
-    --fs-time: 220px;   /* stora siffror i design-ytan (skalning via JS) */
-    --fs-title: 3rem;   /* större rubrik */
-    --fs-subtitle: 1.4rem;
+    /* Mindre klocka */
+    --fs-time: 120px;
+    --fs-title: 2rem;
+    --fs-subtitle: 1.1rem;
 
-    --bar-h: 80px;            /* tjockare bar */
-    --bar-radius: 20px;       /* mer fyrkantig rundning */
-    --bar-bg: #2a2a2a;        /* ofyllda delen */
-    --bar-fill: #ffffff;      /* fyllda delen: VIT igen */
+    /* Mycket tjock bar i centrum */
+    --bar-h: 160px;
+    --bar-radius: 32px;
+
+    --bar-bg: #2a2a2a;   /* ofyllda delen */
+    --bar-fill: #ffffff; /* fyllda delen */
   }
 
   html,body{
     height:100%; margin:0;
-    background:#000;           /* svart bakgrund */
-    color:#fff; overflow:hidden;
+    background:#000; color:#fff; overflow:hidden;
     -webkit-text-size-adjust:100%; text-size-adjust:100%;
   }
-  body.danger{ background:#A5402D; } /* röd bakgrund sista 10 minuterna */
+  /* Röd bakgrund sista 10 minuterna */
+  body.danger{ background:#A5402D; }
 
-  /* === SCEN (fast design-yta 1280×800 som vi skalar/centrerar med JS) === */
+  /* === Fast design-yta 1280×800 som skalas/centreras med JS === */
   #stage{
     position:absolute; left:0; top:0;
-    width:1280px; height:800px;       /* DESIGNMÅTT */
+    width:1280px; height:800px;
     box-sizing:border-box;
-    padding:20px;
+    padding:24px 20px;
     display:grid;
-    grid-template-rows:auto auto 1fr auto; /* titel, undertext, klocka, track */
-    gap:12px;
+    /* Ordning: titel, undertext, STOR BAR, mindre tid under */
+    grid-template-rows:auto auto 1fr auto;
+    gap:14px;
     transform-origin:0 0; will-change:transform; backface-visibility:hidden;
     background:transparent;
   }
@@ -45,20 +49,24 @@
     text-align:center; font-weight:700; opacity:.95;
     font-size: var(--fs-subtitle);
   }
+
+  /* Mindre tid, under baren */
   .time{
     display:grid; place-items:center;
     text-align:center; font-weight:900; line-height:1;
     letter-spacing:.4px; font-size: var(--fs-time);
-    white-space:nowrap; margin-bottom:8px;
+    white-space:nowrap; margin-top:10px;
   }
 
-  /* === Track (bar + ticks) ===
-     Längden sätts i JS för att matcha .time exakt; centrerad med margin:auto. */
+  /* === Track (bar + ticks) – centrerad och bred === */
   .track{
     position:relative;
-    margin: 0 auto;   /* centrerad */
-    padding: 0;       /* ingen sid-padding – bar = exakt samma längd som tids-texten */
-    width: 900px;     /* initial, ersätts av JS */
+    margin:auto;       /* centrerad i sin gridrad */
+    padding:0;
+    width: 1000px;     /* initial – ersätts i JS */
+    display:grid;
+    gap:14px;
+    align-content:center;
   }
   .bar{
     position:relative;
@@ -66,27 +74,30 @@
     background: var(--bar-bg);
     border-radius: var(--bar-radius);
     overflow:hidden;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,.06),
+      0 10px 40px rgba(0,0,0,.55);
   }
   .fill{
     position:absolute;
-    left:0; top:0; bottom:0;   /* WebView 59-kompatibelt */
+    left:0; top:0; bottom:0;
     height:100%;
     width:0%;
-    background: var(--bar-fill);       /* VIT */
+    background: var(--bar-fill);
     border-radius: inherit;
     transform: translateZ(0);
   }
 
-  .ticks{ position:relative; height: 52px; }
+  /* Ticks precis under baren */
+  .ticks{ position:relative; height: 56px; }
   .tick{ position:absolute; top:0; transform:translateX(-50%); text-align:center; }
-  .tick i{ display:block; width:3px; height:24px; background:rgba(255,255,255,.95);
+  .tick i{ display:block; width:3px; height:28px; background:rgba(255,255,255,.95);
            margin:0 auto 6px; border-radius:2px; }
-  .tick span{ font-size:1.15rem; opacity:.98; font-weight:700; }
-  .tick.end i{ width:4px; height:28px; background:#fff; }
+  .tick span{ font-size:1.1rem; opacity:.98; font-weight:700; }
+  .tick.end i{ width:4px; height:30px; background:#fff; }
   .tick.end span{ font-weight:900; }
 
-  /* Settings-knappen: övre högra hörnet */
+  /* Settings-knappen */
   .fab{
     position:absolute; right:16px; top:16px;
     width:64px; height:64px; z-index:10;
@@ -112,12 +123,14 @@
     <div class="title" id="title">Tid kvar</div>
     <div class="subtitle" id="subtitle">–</div>
 
-    <div class="time" id="time">--</div>
-
+    <!-- STOR BAR i mitten -->
     <div class="track" id="track">
       <div class="bar" id="bar"><div class="fill" id="fill"></div></div>
       <div class="ticks" id="ticks"></div>
     </div>
+
+    <!-- Mindre nedräknare under baren -->
+    <div class="time" id="time">--</div>
 
     <div class="fab" id="openSettings" aria-label="Inställningar">⚙︎</div>
 
@@ -213,7 +226,6 @@ function fmtTick(mins){
 function drawTicks(totalMin){
   ticks.innerHTML='';
   var step = chooseTickStep(totalMin);
-  /* Viktigt: rita inte ett tick vid exakt totalMin (annars krockar det med "slut") */
   for(var at=0; at<totalMin; at+=step){
     var left = (at/totalMin)*100;
     var div = document.createElement('div');
@@ -232,7 +244,7 @@ function drawTicks(totalMin){
 /* --- Ljudpip vid slut --- */
 var audioCtx;
 function beep(ms, freq){
-  ms = ms || 200; freq = freq || 880;
+  ms = ms || 800; freq = freq || 100;
   try{
     audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
     var o=audioCtx.createOscillator(), g=audioCtx.createGain();
@@ -258,15 +270,15 @@ function applyScale(){
 window.addEventListener('resize', applyScale);
 window.addEventListener('orientationchange', applyScale);
 
-/* === Matcha barens längd med nedräknarens text === */
+/* === Stor, centrerad bar: bredd relativ till designytan === */
 var __trackW = 0;
-function sizeTrackToTime(){
-  var rect = timeEl.getBoundingClientRect();
-  var wViewport = rect.width || 900;
-  var wDesign = Math.max(300, Math.min(BASE_W, Math.round(wViewport / (__lastScale||1))));
-  if (Math.abs(wDesign - __trackW) > 2){   /* undvik jitter */
-    track.style.width = wDesign + 'px';
-    __trackW = wDesign;
+function sizeTrack(){
+  /* 82% av designbredden, clamp mellan 720–1180 px */
+  var target = Math.round(BASE_W * 0.82);
+  target = Math.max(720, Math.min(1180, target));
+  if (Math.abs(target - __trackW) > 2){
+    track.style.width = target + 'px';
+    __trackW = target;
   }
 }
 
@@ -286,7 +298,6 @@ function loop(){
   var endH = pad2n(Math.floor(endMin/60));
   var endM = pad2n(endMin%60);
 
-  /* titel + undertext */
   title.textContent = 'Tid kvar till ' + nxt.name + ' (kl ' + endH + ':' + endM + ')';
   subtitle.textContent = 'Nästa: ' + nxt.name + ' \u2192 ' +
     pad2n(Math.floor(nxt.a/60)) + ':' + pad2n(nxt.a%60);
@@ -302,8 +313,8 @@ function loop(){
   if (remain <= 10 * 60 * 1000) { document.body.classList.add('danger'); }
   else { document.body.classList.remove('danger'); }
 
-  /* uppdatera track-bredden så den följer texten */
-  sizeTrackToTime();
+  /* uppdatera barens bredd */
+  sizeTrack();
 
   if(remain<=1000 && remain>0){
     for(var i=0;i<5;i++){
@@ -359,14 +370,14 @@ settings.addEventListener('click', function(e){
   var ps=getPeriods(); ps.splice(+idx,1); setPeriods(ps); renderRows();
 });
 
-/* Dubbeltryck för helskärm (om stöds) */
+/* Dubbeltapp för helskärm (om stöds) */
 document.addEventListener('dblclick', function(){
   var el=document.documentElement; if(el.requestFullscreen) el.requestFullscreen();
 });
 
 /* --- Start --- */
 applyScale();
-sizeTrackToTime();
+sizeTrack();
 loop();
 </script>
 </body>
