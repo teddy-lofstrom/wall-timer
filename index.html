@@ -10,10 +10,10 @@
     --fs-title: 3rem;   /* större rubrik */
     --fs-subtitle: 1.4rem;
 
-    --bar-h: 56px;            /* tjockare bar */
-    --bar-radius: 16px;       /* mer fyrkantig rundning */
+    --bar-h: 80px;            /* tjockare bar */
+    --bar-radius: 20px;       /* mer fyrkantig rundning */
     --bar-bg: #2a2a2a;        /* ofyllda delen */
-    --bar-fill: #53917E;      /* fyllda delen (önskad färg) */
+    --bar-fill: #ffffff;      /* fyllda delen: VIT igen */
   }
 
   html,body{
@@ -22,7 +22,7 @@
     color:#fff; overflow:hidden;
     -webkit-text-size-adjust:100%; text-size-adjust:100%;
   }
-  body.danger{ background:#FF7E6B; } /* önskad färg sista 10 minuterna */
+  body.danger{ background:#A5402D; } /* röd bakgrund sista 10 minuterna */
 
   /* === SCEN (fast design-yta 1280×800 som vi skalar/centrerar med JS) === */
   #stage{
@@ -73,7 +73,7 @@
     left:0; top:0; bottom:0;   /* WebView 59-kompatibelt */
     height:100%;
     width:0%;
-    background: var(--bar-fill);       /* solid önskefärg */
+    background: var(--bar-fill);       /* VIT */
     border-radius: inherit;
     transform: translateZ(0);
   }
@@ -254,7 +254,6 @@ function applyScale(){
   var y=(wh-BASE_H*s)/2;
   stage.style.transform='translate('+x+'px,'+y+'px) scale('+s+')';
   __lastScale = s;
-  // console.log('applyScale()', {ww:ww,wh:wh,s:s,x:x,y:y});
 }
 window.addEventListener('resize', applyScale);
 window.addEventListener('orientationchange', applyScale);
