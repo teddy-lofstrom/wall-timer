@@ -12,7 +12,9 @@
     --pad: 16px;
     --radius: 20px;
     --touch: 48px;
-    --fs-time: 140px; /* fylls av JS för att funka i Silk/Fully */
+    /* Basstorlek för klockan i "design-space" 1280×800.
+       Allt skalas sedan via JS-transform, så denna behöver inte vara dynamisk. */
+    --fs-time: 220px;
   }
 
   /* Hindra “wide viewport/overview” från att krympa allt i gamla webviews */
@@ -27,23 +29,38 @@
     color:#fff;
     background:#000;
     overflow:hidden;
-    transition: background .25s ease;
     -webkit-text-size-adjust:100%;
     text-size-adjust:100%;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    transition: background .25s ease;
   }
   body.danger{ background:#8b0000; }
 
-  .wrap{position:relative; height:100%; width:100%; display:grid; place-items:center; padding: var(--pad,16px);}
-  .stage{
-    width:100%; height:100%;
-    padding:20px;
+  /* === SCEN-SKALNING (fix för Fully/WebView 59) ===
+     .fit fyller hela skärmen; #stage är fast 1280×800 och skalas/positioneras med JS. */
+  .fit{
+    position:fixed;
+    inset:0;
+    overflow:hidden;
+    touch-action:manipulation;
+    -ms-content-zooming:none;
+  }
+  #stage{
+    position:absolute;            /* vi flyttar & skalar den via JS */
+    width:1280px;                 /* DESIGN-BREDD */
+    height:800px;                 /* DESIGN-HÖJD  */
     box-sizing:border-box;
+    padding:20px;
     display:grid;
     grid-template-rows:auto 1fr auto auto;
     gap:12px;
+    transform-origin:0 0;         /* viktigt för korrekt skalning från toppen-vänster */
+    will-change:transform;
+    backface-visibility:hidden;
   }
 
-  /* Rem-baserad typografi + JS-styrd klockstorlek */
+  /* Typografi i design-space. Skalas av scen-transformen, inte av viewporten. */
   html { font-size: 16px; }
   .title{ text-align:center; font-weight:800; font-size:1.5rem; letter-spacing:.3px; opacity:.95; }
   .time { display:grid; place-items:center; text-align:center; font-weight:900;
@@ -85,7 +102,7 @@
 </style>
 </head>
 <body>
-  <div class="wrap">
+  <div class="fit" id="fit">
     <div class="stage" id="stage">
       <div class="title" id="title">Tid kvar</div>
       <div class="time" id="time">--</div>
@@ -117,10 +134,13 @@
   </div>
 
 <script>
-/* --- Selektorer --- */
+/* --- Snabb $ --- */
 const $ = s=>document.querySelector(s);
+
+/* --- Element --- */
 const title=$('#title'), timeEl=$('#time'), fill=$('#fill'), ticks=$('#ticks');
 const active=$('#activePeriod'), nextP=$('#nextPeriod'), settings=$('#settings');
+const stage=$('#stage');
 
 /* --- Perioddata --- */
 const DEFAULT_PERIODS = [
@@ -203,19 +223,32 @@ function beep(ms=200, freq=880){
   }catch(e){}
 }
 
-/* --- SILK/FULLY-SAFE TYPOGRAFISK SKALNING --- */
-function fitTypography(){
-  const w = Math.max(320, window.innerWidth  || document.documentElement.clientWidth  || 0);
-  const h = Math.max(320, window.innerHeight || document.documentElement.clientHeight || 0);
-  // stora siffror ≈ 24% av höjd men max 18% av bredd
-  const fsByH = h * 0.24;
-  const fsByW = w * 0.18;
-  const fs = Math.round(Math.min(fsByH, fsByW));
-  document.documentElement.style.setProperty('--fs-time', fs + 'px');
+/* === SCEN-SKALNING ===
+   Skala en fast 1280×800-layout till faktisk viewport utan att använda vh/clamp/zoom. */
+const BASE_W = 1280;
+const BASE_H = 800;
+
+function applyScale(){
+  // Faktisk viewport (ta höjd för gamla WebView-mått)
+  const ww = Math.max(320, window.innerWidth  || document.documentElement.clientWidth  || 0);
+  const wh = Math.max(320, window.innerHeight || document.documentElement.clientHeight || 0);
+
+  // Proportionerlig skala
+  let s = Math.min(ww / BASE_W, wh / BASE_H);
+  // Liten avrundning för att minska text-blurr (men behåll flyt)
+  s = Math.max(0.1, Math.min(4, s));
+  const sStr = s.toFixed(4);
+
+  // Centrera scenen
+  const x = Math.round((ww - BASE_W * s) / 2);
+  const y = Math.round((wh - BASE_H * s) / 2);
+
+  // Applicera transform – allt inuti #stage följer med
+  stage.style.transform = `translate(${x}px, ${y}px) scale(${sStr})`;
 }
-fitTypography();
-window.addEventListener('resize', fitTypography);
-window.addEventListener('orientationchange', fitTypography);
+
+window.addEventListener('resize', applyScale);
+window.addEventListener('orientationchange', applyScale);
 
 /* --- Huvudloop --- */
 function loop(){
@@ -291,7 +324,8 @@ document.addEventListener('dblclick', ()=>{
   const el=document.documentElement; if(el.requestFullscreen) el.requestFullscreen();
 });
 
-/* start */
+/* --- Start --- */
+applyScale();
 loop();
 </script>
 </body>
