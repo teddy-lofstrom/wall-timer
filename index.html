@@ -142,11 +142,13 @@ var settings=$('#settings'), stage=$('#stage'), track=$('#track');
 
 /* --- Perioddata --- */
 var DEFAULT_PERIODS = [
-  { name:"Morgon",     start:"07:00", end:"09:00" },
-  { name:"Arbetstid",  start:"09:00", end:"17:00" },
-  { name:"Kväll",      start:"17:00", end:"22:30" },
-  { name:"Läggdags",   start:"22:30", end:"23:59" },
-  { name:"Natt",       start:"00:00", end:"07:00" }
+  { name:"Morgon",      start:"06:30", end:"08:00" },
+  { name:"Förmiddag",   start:"08:00", end:"12:00" },
+  { name:"Lunch",       start:"12:00", end:"13:00" },
+  { name:"Eftermiddag", start:"13:00", end:"17:00" },
+  { name:"Kväll",       start:"17:00", end:"22:15" },
+  { name:"Kvällsrutin", start:"22:15", end:"22:30" },
+  { name:"Natt",        start:"22:30", end:"06:30" }
 ];
 function getPeriods(){
   try{
