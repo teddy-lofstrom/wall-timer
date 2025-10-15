@@ -3,41 +3,37 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
-<title>Väggtimer – färgdynamisk version</title>
+<title>Väggtimer – skalad scen (matchad bar)</title>
 <style>
   :root{
-    --fs-time: 220px;
-    --fs-title: 3rem;
+    --fs-time: 220px;   /* stora siffror i design-ytan (skalning via JS) */
+    --fs-title: 3rem;   /* större rubrik */
     --fs-subtitle: 1.4rem;
 
-    --bar-h: 56px;
-    --bar-radius: 16px;
-
-    --bar-bg: #2a2a2a;
-    --bar-fill: #FF8811;
+    --bar-h: 56px;            /* tjockare bar */
+    --bar-radius: 16px;       /* mer fyrkantig rundning */
+    --bar-bg: #2a2a2a;        /* ofyllda delen */
+    --bar-fill: #53917E;      /* fyllda delen (önskad färg) */
   }
 
   html,body{
     height:100%; margin:0;
-    background:#000;
+    background:#000;           /* svart bakgrund */
     color:#fff; overflow:hidden;
     -webkit-text-size-adjust:100%; text-size-adjust:100%;
-    transition:background 0.6s ease;
   }
+  body.danger{ background:#FF7E6B; } /* önskad färg sista 10 minuterna */
 
-  body.danger{
-    background:#226EB1;
-  }
-
+  /* === SCEN (fast design-yta 1280×800 som vi skalar/centrerar med JS) === */
   #stage{
     position:absolute; left:0; top:0;
-    width:1280px; height:800px;
+    width:1280px; height:800px;       /* DESIGNMÅTT */
     box-sizing:border-box;
     padding:20px;
     display:grid;
-    grid-template-rows:auto auto 1fr auto;
+    grid-template-rows:auto auto 1fr auto; /* titel, undertext, klocka, track */
     gap:12px;
-    transform-origin:0 0; will-change:transform;
+    transform-origin:0 0; will-change:transform; backface-visibility:hidden;
     background:transparent;
   }
 
@@ -56,14 +52,14 @@
     white-space:nowrap; margin-bottom:8px;
   }
 
+  /* === Track (bar + ticks) ===
+     Längden sätts i JS för att matcha .time exakt; centrerad med margin:auto. */
   .track{
     position:relative;
-    margin: 0 auto;
-    padding: 0;
-    width: 900px;
-    transition: background 0.6s ease;
+    margin: 0 auto;   /* centrerad */
+    padding: 0;       /* ingen sid-padding – bar = exakt samma längd som tids-texten */
+    width: 900px;     /* initial, ersätts av JS */
   }
-
   .bar{
     position:relative;
     height: var(--bar-h);
@@ -71,15 +67,13 @@
     border-radius: var(--bar-radius);
     overflow:hidden;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
-    transition: background 0.6s ease;
   }
-
   .fill{
     position:absolute;
-    left:0; top:0; bottom:0;
+    left:0; top:0; bottom:0;   /* WebView 59-kompatibelt */
     height:100%;
     width:0%;
-    background: var(--bar-fill);
+    background: var(--bar-fill);       /* solid önskefärg */
     border-radius: inherit;
     transform: translateZ(0);
   }
@@ -92,6 +86,7 @@
   .tick.end i{ width:4px; height:28px; background:#fff; }
   .tick.end span{ font-weight:900; }
 
+  /* Settings-knappen: övre högra hörnet */
   .fab{
     position:absolute; right:16px; top:16px;
     width:64px; height:64px; z-index:10;
@@ -135,102 +130,245 @@
         <button id="save">Spara</button>
         <button id="close">Stäng</button>
       </div>
+      <p><small>Tips: Kör i helskärm. Allt sparas lokalt i webbläsaren.</small></p>
     </div>
   </div>
 
 <script>
-var $ = s => document.querySelector(s);
+/* --- Selektorer --- */
+var $ = function(s){ return document.querySelector(s); };
 var title=$('#title'), subtitle=$('#subtitle'), timeEl=$('#time'), fill=$('#fill'), ticks=$('#ticks');
-var bar=$('#bar'), track=$('#track');
+var settings=$('#settings'), stage=$('#stage'), track=$('#track');
 
-var DEFAULT_PERIODS=[
-  {name:"Morgon",start:"07:00",end:"09:00"},
-  {name:"Arbetstid",start:"09:00",end:"17:00"},
-  {name:"Kväll",start:"17:00",end:"22:30"},
-  {name:"Läggdags",start:"22:30",end:"23:59"},
-  {name:"Natt",start:"00:00",end:"07:00"}
+/* --- Perioddata --- */
+var DEFAULT_PERIODS = [
+  { name:"Morgon",     start:"07:00", end:"09:00" },
+  { name:"Arbetstid",  start:"09:00", end:"17:00" },
+  { name:"Kväll",      start:"17:00", end:"22:30" },
+  { name:"Läggdags",   start:"22:30", end:"23:59" },
+  { name:"Natt",       start:"00:00", end:"07:00" }
 ];
 function getPeriods(){
-  try{let r=localStorage.getItem('walltimer.periods');
-    let arr=r?JSON.parse(r):DEFAULT_PERIODS;
-    return Array.isArray(arr)&&arr.length?arr:DEFAULT_PERIODS;
-  }catch(e){return DEFAULT_PERIODS;}
+  try{
+    var r=localStorage.getItem('walltimer.periods');
+    var arr=r?JSON.parse(r):DEFAULT_PERIODS;
+    return (Object.prototype.toString.call(arr)==='[object Array]' && arr.length)?arr:DEFAULT_PERIODS;
+  }catch(e){ return DEFAULT_PERIODS; }
 }
-function setPeriods(p){localStorage.setItem('walltimer.periods',JSON.stringify(p));}
-function t2m(t){let [h,m]=t.split(':').map(Number);return (h%24)*60+(m||0);}
-function nowMin(){let n=new Date();return n.getHours()*60+n.getMinutes()+n.getSeconds()/60;}
-function pad2(x){return(x<10?'0':'')+x;}
-function fmt(ms){let s=Math.max(0,Math.floor(ms/1000));let h=Math.floor(s/3600);s-=h*3600;let m=Math.floor(s/60);s-=m*60;return h+'h '+m+'m '+pad2(s)+'s';}
-function expand(ps){let out=[];for(let p of ps){let a=t2m(p.start),b=t2m(p.end);if(b>=a)out.push({...p,a,b});else{out.push({...p,a,b:1440});out.push({...p,a:0,b});}}out.sort((x,y)=>x.a-y.a);return out;}
-function pick(ps){let n=nowMin(),list=expand(ps),cur=null,nxt=null;for(let i=0;i<list.length;i++){let p=list[i];if(n>=p.a&&n<p.b){cur=p;nxt=list[(i+1)%list.length];break;}}if(!cur){nxt=list.find(p=>p.a>n)||list[0];cur={name:"Paus",a:n,b:nxt.a};}return{cur,nxt};}
+function setPeriods(p){ localStorage.setItem('walltimer.periods', JSON.stringify(p)); }
 
+/* --- Hjälp --- */
+function t2m(t){ var parts=t.split(':'), h=+parts[0], m=+parts[1]||0; return (h%24)*60+m; }
+function nowMin(){ var n=new Date(); return n.getHours()*60+n.getMinutes()+n.getSeconds()/60; }
+function pad2(x){ return (x<10?'0':'')+x; }
+function fmt(ms){
+  var s=Math.max(0, Math.floor(ms/1000));
+  var h=Math.floor(s/3600); s-=h*3600;
+  var m=Math.floor(s/60); s-=m*60;
+  return h+'h '+m+'m '+pad2(s)+'s';
+}
+
+/* --- Splitta över midnatt & välj period (Chrome 59-vänligt) --- */
+function expand(ps){
+  var out=[];
+  for(var i=0;i<ps.length;i++){
+    var p=ps[i], a=t2m(p.start), b=t2m(p.end);
+    if(b>=a){
+      out.push(Object.assign({}, p, {a:a, b:b}));
+    }else{
+      out.push(Object.assign({}, p, {a:a, b:1440}));
+      out.push(Object.assign({}, p, {a:0,  b:b}));
+    }
+  }
+  out.sort(function(x,y){ return x.a - y.a; });
+  return out;
+}
+function pick(ps){
+  var n=nowMin(), list=expand(ps);
+  var cur=null, nxt=null;
+  for(var i=0;i<list.length;i++){
+    var p=list[i];
+    if(n>=p.a && n<p.b){ cur=p; nxt=list[(i+1)%list.length]; break; }
+  }
+  if(!cur){
+    nxt = (function(){
+      for(var j=0;j<list.length;j++){ if(list[j].a>n) return list[j]; }
+      return list[0];
+    })();
+    cur = { name:"Paus", a:n, b:nxt.a };
+  }
+  return {cur:cur, nxt:nxt};
+}
+
+/* --- Ticks --- */
+function chooseTickStep(totalMin){
+  if (totalMin <= 120) return 30;
+  if (totalMin <= 480) return 60;
+  return 120;
+}
+function fmtTick(mins){
+  if (mins % 60 === 0) return (mins/60)+'h';
+  return (mins%60)+'m';
+}
 function drawTicks(totalMin){
   ticks.innerHTML='';
-  let step=totalMin<=120?30:totalMin<=480?60:120;
-  for(let at=0;at<totalMin;at+=step){
-    let left=(at/totalMin)*100;
-    let div=document.createElement('div');
+  var step = chooseTickStep(totalMin);
+  /* Viktigt: rita inte ett tick vid exakt totalMin (annars krockar det med "slut") */
+  for(var at=0; at<totalMin; at+=step){
+    var left = (at/totalMin)*100;
+    var div = document.createElement('div');
     div.className='tick';
-    div.style.left=left+'%';
-    div.innerHTML='<i></i><span>'+((at%60===0)?(at/60)+'h':(at%60)+'m')+'</span>';
+    div.style.left = left+'%';
+    div.innerHTML = '<i></i><span>'+fmtTick(at)+'</span>';
     ticks.appendChild(div);
   }
-  let end=document.createElement('div');
-  end.className='tick end';end.style.left='100%';
-  end.innerHTML='<i></i><span>slut</span>';ticks.appendChild(end);
+  var end = document.createElement('div');
+  end.className = 'tick end';
+  end.style.left = '100%';
+  end.innerHTML = '<i></i><span>slut</span>';
+  ticks.appendChild(end);
 }
 
-function mixColor(c1,c2,f){
-  function hexToRgb(h){let n=parseInt(h.slice(1),16);return[(n>>16)&255,(n>>8)&255,n&255];}
-  function rgbToHex(r,g,b){return"#"+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');}
-  let a=hexToRgb(c1),b=hexToRgb(c2);
-  let m=a.map((x,i)=>Math.round(x*(1-f)+b[i]*f));
-  return rgbToHex(...m);
+/* --- Ljudpip vid slut --- */
+var audioCtx;
+function beep(ms, freq){
+  ms = ms || 200; freq = freq || 880;
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    var o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.type='sine'; o.frequency.value=freq; g.gain.value=.05; o.start();
+    setTimeout(function(){ o.stop(); }, ms);
+  }catch(e){}
 }
 
-function updateBarBackground(){
-  let bg=getComputedStyle(document.body).backgroundColor;
-  let tmp=document.createElement('div');
-  tmp.style.color=bg;document.body.appendChild(tmp);
-  let rgb=window.getComputedStyle(tmp).color;document.body.removeChild(tmp);
-  let match=rgb.match(/\d+/g);
-  let bgHex=match?"#"+match.map(x=>(+x).toString(16).padStart(2,'0')).join(''):"#000000";
-  let fillColor=getComputedStyle(fill).backgroundColor;
-  tmp.style.color=fillColor;document.body.appendChild(tmp);
-  rgb=window.getComputedStyle(tmp).color;document.body.removeChild(tmp);
-  match=rgb.match(/\d+/g);
-  let fillHex=match?"#"+match.map(x=>(+x).toString(16).padStart(2,'0')).join(''):"#ffffff";
-  track.style.background=mixColor(bgHex,fillHex,0.25);
-  bar.style.background=mixColor(bgHex,fillHex,0.35);
+/* === SCEN-SKALNING (fix för WebView 59) === */
+var BASE_W = 1280, BASE_H = 800;
+var __lastScale = 1;
+function applyScale(){
+  var ww=Math.max(100, window.innerWidth  || document.documentElement.clientWidth  || 0);
+  var wh=Math.max(100, window.innerHeight || document.documentElement.clientHeight || 0);
+  var s=Math.min(ww/BASE_W, wh/BASE_H);
+  s=Math.max(0.1,Math.min(4,s));
+  var x=(ww-BASE_W*s)/2;
+  var y=(wh-BASE_H*s)/2;
+  stage.style.transform='translate('+x+'px,'+y+'px) scale('+s+')';
+  __lastScale = s;
+  // console.log('applyScale()', {ww:ww,wh:wh,s:s,x:x,y:y});
+}
+window.addEventListener('resize', applyScale);
+window.addEventListener('orientationchange', applyScale);
+
+/* === Matcha barens längd med nedräknarens text === */
+var __trackW = 0;
+function sizeTrackToTime(){
+  var rect = timeEl.getBoundingClientRect();
+  var wViewport = rect.width || 900;
+  var wDesign = Math.max(300, Math.min(BASE_W, Math.round(wViewport / (__lastScale||1))));
+  if (Math.abs(wDesign - __trackW) > 2){   /* undvik jitter */
+    track.style.width = wDesign + 'px';
+    __trackW = wDesign;
+  }
 }
 
+/* --- Huvudloop --- */
+function pad2n(n){ return (n<10?'0':'')+n; }
 function loop(){
-  let ps=getPeriods();
-  let {cur,nxt}=pick(ps);
-  let n=new Date();
-  let nMin=n.getHours()*60+n.getMinutes()+n.getSeconds()/60;
-  let total=(cur.b-cur.a)*60000;
-  let passed=(nMin-cur.a)*60000;
-  let remain=Math.max(0,total-passed);
+  var ps=getPeriods();
+  var picked = pick(ps);
+  var cur=picked.cur, nxt=picked.nxt;
+  var n = new Date();
+  var nMin = n.getHours()*60 + n.getMinutes() + n.getSeconds()/60;
+  var total = (cur.b - cur.a) * 60 * 1000;
+  var passed = (nMin - cur.a) * 60 * 1000;
+  var remain = Math.max(0, total - passed);
 
-  title.textContent='Tid kvar till '+nxt.name;
-  subtitle.textContent='Nästa: '+nxt.name;
+  var endMin = cur.b % 1440;
+  var endH = pad2n(Math.floor(endMin/60));
+  var endM = pad2n(endMin%60);
 
-  timeEl.textContent=fmt(remain);
+  /* titel + undertext */
+  title.textContent = 'Tid kvar till ' + nxt.name + ' (kl ' + endH + ':' + endM + ')';
+  subtitle.textContent = 'Nästa: ' + nxt.name + ' \u2192 ' +
+    pad2n(Math.floor(nxt.a/60)) + ':' + pad2n(nxt.a%60);
 
-  let pct=total>0?Math.min(100,Math.max(0,(passed/total)*100)):100;
-  fill.style.width=pct+'%';
+  timeEl.textContent = fmt(remain);
 
-  drawTicks(cur.b-cur.a);
+  var pct = total>0 ? Math.min(100, Math.max(0, (passed/total)*100)) : 100;
+  fill.style.width = pct + '%';
 
-  if(remain<=10*60*1000)document.body.classList.add('danger');
-  else document.body.classList.remove('danger');
+  drawTicks((cur.b - cur.a));
 
-  updateBarBackground();
+  /* röd bakgrund vid ≤ 10 min */
+  if (remain <= 10 * 60 * 1000) { document.body.classList.add('danger'); }
+  else { document.body.classList.remove('danger'); }
+
+  /* uppdatera track-bredden så den följer texten */
+  sizeTrackToTime();
+
+  if(remain<=1000 && remain>0){
+    for(var i=0;i<5;i++){
+      (function(k){ setTimeout(function(){ beep(120, 1000+k*60); }, k*180); })(i);
+    }
+  }
 
   requestAnimationFrame(loop);
 }
-window.addEventListener('load',()=>requestAnimationFrame(loop));
+
+/* --- Inställnings-UI --- */
+function openSettings(v){ settings.style.display = (v===false)? 'none':'block'; }
+function rowTpl(p,i){
+  return '<div class="row" data-i="'+i+'">'+
+    '<input type="text" value="'+p.name+'" aria-label="Namn" placeholder="Namn (t.ex. Läggdags)" />'+
+    '<input type="time" value="'+p.start+'" aria-label="Start" />'+
+    '<input type="time" value="'+p.end+'" aria-label="Slut" />'+
+    '<button data-del="'+i+'">Ta bort</button>'+
+  '</div>';
+}
+function renderRows(){
+  var rows=$('#rows'); var ps=getPeriods();
+  var html=''; for(var i=0;i<ps.length;i++){ html+=rowTpl(ps[i],i); }
+  rows.innerHTML = html;
+}
+function saveRows(){
+  var rowEls=[].slice.call(document.querySelectorAll('.row'));
+  var arr = rowEls.map(function(r){
+    var ins=[].slice.call(r.querySelectorAll('input'));
+    var name=ins[0].value, start=ins[1].value, end=ins[2].value;
+    return { name: name||'Period', start: start, end: end };
+  });
+  setPeriods(arr); renderRows(); openSettings(false);
+}
+
+$('#openSettings').addEventListener('click', function(){ renderRows(); openSettings(true); });
+var touchTimer=null;
+document.addEventListener('touchstart', function(){
+  touchTimer=setTimeout(function(){ renderRows(); openSettings(true); }, 650);
+}, {passive:true});
+document.addEventListener('touchend', function(){
+  if(touchTimer){ clearTimeout(touchTimer); touchTimer=null; }
+}, {passive:true});
+
+$('#close').addEventListener('click', function(){ openSettings(false); });
+$('#save').addEventListener('click', saveRows);
+$('#add').addEventListener('click', function(){
+  var ps=getPeriods(); ps.push({name:"Ny period", start:"12:00", end:"13:00"}); setPeriods(ps); renderRows();
+});
+settings.addEventListener('click', function(e){
+  var el=e.target; if(!el || !el.getAttribute) return;
+  var idx=el.getAttribute('data-del'); if(idx==null) return;
+  var ps=getPeriods(); ps.splice(+idx,1); setPeriods(ps); renderRows();
+});
+
+/* Dubbeltryck för helskärm (om stöds) */
+document.addEventListener('dblclick', function(){
+  var el=document.documentElement; if(el.requestFullscreen) el.requestFullscreen();
+});
+
+/* --- Start --- */
+applyScale();
+sizeTrackToTime();
+loop();
 </script>
 </body>
 </html>
