@@ -3,26 +3,26 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
-<title>Väggtimer – skalad scen (fixad bar för WebView 59)</title>
+<title>Väggtimer – skalad scen (matchad bar)</title>
 <style>
   :root{
-    --pad: 16px;
-    --radius: 20px;
-    --touch: 48px;
     --fs-time: 220px;   /* stora siffror i design-ytan (skalning via JS) */
     --fs-title: 3rem;   /* större rubrik */
     --fs-subtitle: 1.4rem;
-    --track-lr: 120px;  /* sidomarginaler för bar + ticks (design-space px) */
-    --bar-h: 56px;      /* tjockare bar */
+
+    --bar-h: 56px;            /* tjockare bar */
+    --bar-radius: 16px;       /* mer fyrkantig rundning */
+    --bar-bg: #2a2a2a;        /* ofyllda delen */
+    --bar-fill: #53917E;      /* fyllda delen (önskad färg) */
   }
 
   html,body{
     height:100%; margin:0;
-    background:#000;     /* svart bakgrund */
+    background:#000;           /* svart bakgrund */
     color:#fff; overflow:hidden;
     -webkit-text-size-adjust:100%; text-size-adjust:100%;
   }
-  body.danger{ background:#8b0000; } /* röd vid ≤ 10 min kvar */
+  body.danger{ background:#FF7E6B; } /* önskad färg sista 10 minuterna */
 
   /* === SCEN (fast design-yta 1280×800 som vi skalar/centrerar med JS) === */
   #stage{
@@ -52,28 +52,30 @@
     white-space:nowrap; margin-bottom:8px;
   }
 
-  /* === Progress + ticks i en gemensam "track" med sidomarginaler === */
+  /* === Track (bar + ticks) ===
+     Längden sätts i JS för att matcha .time exakt; centrerad med margin:auto. */
   .track{
     position:relative;
-    padding-left: var(--track-lr);
-    padding-right: var(--track-lr);
+    margin: 0 auto;   /* centrerad */
+    padding: 0;       /* ingen sid-padding – bar = exakt samma längd som tids-texten */
+    width: 900px;     /* initial, ersätts av JS */
   }
   .bar{
     position:relative;
     height: var(--bar-h);
-    background:#2a2a2a;         /* mörk “ofylld” del för kontrast */
-    border-radius:999px; overflow:hidden;
+    background: var(--bar-bg);
+    border-radius: var(--bar-radius);
+    overflow:hidden;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
   }
   .fill{
     position:absolute;
-    left:0; top:0; bottom:0;     /* istället för inset: (Chrome 59-kompatibelt) */
+    left:0; top:0; bottom:0;   /* WebView 59-kompatibelt */
     height:100%;
     width:0%;
-    background:#ffffff;          /* fallback */
-    background-image:linear-gradient(90deg,#ffffff,#e9e9e9);
-    border-radius:inherit;
-    transform: translateZ(0);    /* reducera gamla compositing-buggar */
+    background: var(--bar-fill);       /* solid önskefärg */
+    border-radius: inherit;
+    transform: translateZ(0);
   }
 
   .ticks{ position:relative; height: 52px; }
@@ -112,7 +114,7 @@
 
     <div class="time" id="time">--</div>
 
-    <div class="track">
+    <div class="track" id="track">
       <div class="bar" id="bar"><div class="fill" id="fill"></div></div>
       <div class="ticks" id="ticks"></div>
     </div>
@@ -136,7 +138,7 @@
 /* --- Selektorer --- */
 var $ = function(s){ return document.querySelector(s); };
 var title=$('#title'), subtitle=$('#subtitle'), timeEl=$('#time'), fill=$('#fill'), ticks=$('#ticks');
-var settings=$('#settings'), stage=$('#stage');
+var settings=$('#settings'), stage=$('#stage'), track=$('#track');
 
 /* --- Perioddata --- */
 var DEFAULT_PERIODS = [
@@ -211,7 +213,8 @@ function fmtTick(mins){
 function drawTicks(totalMin){
   ticks.innerHTML='';
   var step = chooseTickStep(totalMin);
-  for(var at=0; at<=totalMin; at+=step){
+  /* Viktigt: rita inte ett tick vid exakt totalMin (annars krockar det med "slut") */
+  for(var at=0; at<totalMin; at+=step){
     var left = (at/totalMin)*100;
     var div = document.createElement('div');
     div.className='tick';
@@ -241,6 +244,7 @@ function beep(ms, freq){
 
 /* === SCEN-SKALNING (fix för WebView 59) === */
 var BASE_W = 1280, BASE_H = 800;
+var __lastScale = 1;
 function applyScale(){
   var ww=Math.max(100, window.innerWidth  || document.documentElement.clientWidth  || 0);
   var wh=Math.max(100, window.innerHeight || document.documentElement.clientHeight || 0);
@@ -249,12 +253,26 @@ function applyScale(){
   var x=(ww-BASE_W*s)/2;
   var y=(wh-BASE_H*s)/2;
   stage.style.transform='translate('+x+'px,'+y+'px) scale('+s+')';
-  console.log('applyScale()', {ww:ww,wh:wh,s:s,x:x,y:y});
+  __lastScale = s;
+  // console.log('applyScale()', {ww:ww,wh:wh,s:s,x:x,y:y});
 }
 window.addEventListener('resize', applyScale);
 window.addEventListener('orientationchange', applyScale);
 
+/* === Matcha barens längd med nedräknarens text === */
+var __trackW = 0;
+function sizeTrackToTime(){
+  var rect = timeEl.getBoundingClientRect();
+  var wViewport = rect.width || 900;
+  var wDesign = Math.max(300, Math.min(BASE_W, Math.round(wViewport / (__lastScale||1))));
+  if (Math.abs(wDesign - __trackW) > 2){   /* undvik jitter */
+    track.style.width = wDesign + 'px';
+    __trackW = wDesign;
+  }
+}
+
 /* --- Huvudloop --- */
+function pad2n(n){ return (n<10?'0':'')+n; }
 function loop(){
   var ps=getPeriods();
   var picked = pick(ps);
@@ -266,13 +284,13 @@ function loop(){
   var remain = Math.max(0, total - passed);
 
   var endMin = cur.b % 1440;
-  var endH = pad2(Math.floor(endMin/60));
-  var endM = pad2(endMin%60);
+  var endH = pad2n(Math.floor(endMin/60));
+  var endM = pad2n(endMin%60);
 
   /* titel + undertext */
   title.textContent = 'Tid kvar till ' + nxt.name + ' (kl ' + endH + ':' + endM + ')';
   subtitle.textContent = 'Nästa: ' + nxt.name + ' \u2192 ' +
-    pad2(Math.floor(nxt.a/60)) + ':' + pad2(nxt.a%60);
+    pad2n(Math.floor(nxt.a/60)) + ':' + pad2n(nxt.a%60);
 
   timeEl.textContent = fmt(remain);
 
@@ -284,6 +302,9 @@ function loop(){
   /* röd bakgrund vid ≤ 10 min */
   if (remain <= 10 * 60 * 1000) { document.body.classList.add('danger'); }
   else { document.body.classList.remove('danger'); }
+
+  /* uppdatera track-bredden så den följer texten */
+  sizeTrackToTime();
 
   if(remain<=1000 && remain>0){
     for(var i=0;i<5;i++){
@@ -346,6 +367,7 @@ document.addEventListener('dblclick', function(){
 
 /* --- Start --- */
 applyScale();
+sizeTrackToTime();
 loop();
 </script>
 </body>
