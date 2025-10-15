@@ -6,32 +6,32 @@
 <title>Väggtimer – skalad scen (matchad bar)</title>
 <style>
   :root{
-    --fs-time: 220px;   /* stora siffror i design-ytan (skalning via JS) */
-    --fs-title: 3rem;   /* större rubrik */
+    --fs-time: 220px;
+    --fs-title: 3rem;
     --fs-subtitle: 1.4rem;
 
-    --bar-h: 56px;            /* tjockare bar */
-    --bar-radius: 16px;       /* mer fyrkantig rundning */
-    --bar-bg: #2a2a2a;        /* ofyllda delen */
-    --bar-fill: #ffffff;      /* fyllda delen: VIT igen */
+    --bar-h: 56px;
+    --bar-radius: 16px;
+    --bar-bg: #2a2a2a;
+    --bar-fill: #ffffff;
   }
 
   html,body{
     height:100%; margin:0;
-    background:#000;           /* svart bakgrund */
+    background:#000;
     color:#fff; overflow:hidden;
     -webkit-text-size-adjust:100%; text-size-adjust:100%;
   }
-  body.danger{ background:#A5402D; } /* röd bakgrund sista 10 minuterna */
+  body.danger{ background:#A5402D; }
 
-  /* === SCEN (fast design-yta 1280×800 som vi skalar/centrerar med JS) === */
+  /* === SCEN (1280×800, skalas via JS) === */
   #stage{
     position:absolute; left:0; top:0;
-    width:1280px; height:800px;       /* DESIGNMÅTT */
+    width:1280px; height:800px;
     box-sizing:border-box;
     padding:20px;
     display:grid;
-    grid-template-rows:auto auto 1fr auto; /* titel, undertext, klocka, track */
+    grid-template-rows:auto auto 1fr auto;
     gap:12px;
     transform-origin:0 0; will-change:transform; backface-visibility:hidden;
     background:transparent;
@@ -52,13 +52,11 @@
     white-space:nowrap; margin-bottom:8px;
   }
 
-  /* === Track (bar + ticks) ===
-     Längden sätts i JS för att matcha .time exakt; centrerad med margin:auto. */
   .track{
     position:relative;
-    margin: 0 auto;   /* centrerad */
-    padding: 0;       /* ingen sid-padding – bar = exakt samma längd som tids-texten */
-    width: 900px;     /* initial, ersätts av JS */
+    margin: 0 auto;
+    padding: 0;
+    width: 900px; /* sätts via JS */
   }
   .bar{
     position:relative;
@@ -70,10 +68,10 @@
   }
   .fill{
     position:absolute;
-    left:0; top:0; bottom:0;   /* WebView 59-kompatibelt */
+    left:0; top:0; bottom:0;
     height:100%;
     width:0%;
-    background: var(--bar-fill);       /* VIT */
+    background: var(--bar-fill);
     border-radius: inherit;
     transform: translateZ(0);
   }
@@ -86,7 +84,7 @@
   .tick.end i{ width:4px; height:28px; background:#fff; }
   .tick.end span{ font-weight:900; }
 
-  /* Settings-knappen: övre högra hörnet */
+  /* Settings-knappen */
   .fab{
     position:absolute; right:16px; top:16px;
     width:64px; height:64px; z-index:10;
@@ -96,9 +94,10 @@
     box-shadow: 0 8px 24px rgba(0,0,0,.4);
   }
 
+  /* === INSTÄLLNINGAR – flyttad UTANFÖR den skalade scenen === */
   .settings{
-    position:absolute; inset:0; background:rgba(0,0,0,.94);
-    border:none; padding:20px; display:none; overflow:auto; z-index:20;
+    position:fixed; inset:0; background:rgba(0,0,0,.94);
+    border:none; padding:20px; display:none; overflow:auto; z-index:9999;
   }
   .settings h2{margin:.2em 0 .6em; font-size:1.375rem;}
   .row{display:grid; grid-template-columns:1.2fr 1fr 1fr auto; gap:10px; align-items:center; margin:.5em 0;}
@@ -120,18 +119,19 @@
     </div>
 
     <div class="fab" id="openSettings" aria-label="Inställningar">⚙︎</div>
+  </div>
 
-    <div class="settings" id="settings">
-      <h2>Perioder</h2>
-      <p>Lägg till tidsperioder för dygnet. Timern väljer automatiskt den period som matchar klockslaget och räknar ner till periodens slut.</p>
-      <div id="rows"></div>
-      <div class="actions">
-        <button id="add">+ Lägg till period</button>
-        <button id="save">Spara</button>
-        <button id="close">Stäng</button>
-      </div>
-      <p><small>Tips: Kör i helskärm. Allt sparas lokalt i webbläsaren.</small></p>
+  <!-- SETTINGS FLYTTAD HIT, UTANFÖR #stage -->
+  <div class="settings" id="settings">
+    <h2>Perioder</h2>
+    <p>Lägg till tidsperioder för dygnet. Timern väljer automatiskt den period som matchar klockslaget och räknar ner till periodens slut.</p>
+    <div id="rows"></div>
+    <div class="actions">
+      <button id="add">+ Lägg till period</button>
+      <button id="save">Spara</button>
+      <button id="close">Stäng</button>
     </div>
+    <p><small>Tips: Kör i helskärm. Allt sparas lokalt i webbläsaren.</small></p>
   </div>
 
 <script>
@@ -168,7 +168,7 @@ function fmt(ms){
   return h+'h '+m+'m '+pad2(s)+'s';
 }
 
-/* --- Splitta över midnatt & välj period (Chrome 59-vänligt) --- */
+/* --- Splitta över midnatt & välj period --- */
 function expand(ps){
   var out=[];
   for(var i=0;i<ps.length;i++){
@@ -213,7 +213,6 @@ function fmtTick(mins){
 function drawTicks(totalMin){
   ticks.innerHTML='';
   var step = chooseTickStep(totalMin);
-  /* Viktigt: rita inte ett tick vid exakt totalMin (annars krockar det med "slut") */
   for(var at=0; at<totalMin; at+=step){
     var left = (at/totalMin)*100;
     var div = document.createElement('div');
@@ -242,7 +241,7 @@ function beep(ms, freq){
   }catch(e){}
 }
 
-/* === SCEN-SKALNING (fix för WebView 59) === */
+/* === SCEN-SKALNING === */
 var BASE_W = 1280, BASE_H = 800;
 var __lastScale = 1;
 function applyScale(){
@@ -264,7 +263,7 @@ function sizeTrackToTime(){
   var rect = timeEl.getBoundingClientRect();
   var wViewport = rect.width || 900;
   var wDesign = Math.max(300, Math.min(BASE_W, Math.round(wViewport / (__lastScale||1))));
-  if (Math.abs(wDesign - __trackW) > 2){   /* undvik jitter */
+  if (Math.abs(wDesign - __trackW) > 2){
     track.style.width = wDesign + 'px';
     __trackW = wDesign;
   }
@@ -286,7 +285,6 @@ function loop(){
   var endH = pad2n(Math.floor(endMin/60));
   var endM = pad2n(endMin%60);
 
-  /* titel + undertext */
   title.textContent = 'Tid kvar till ' + nxt.name + ' (kl ' + endH + ':' + endM + ')';
   subtitle.textContent = 'Nästa: ' + nxt.name + ' \u2192 ' +
     pad2n(Math.floor(nxt.a/60)) + ':' + pad2n(nxt.a%60);
@@ -298,11 +296,9 @@ function loop(){
 
   drawTicks((cur.b - cur.a));
 
-  /* röd bakgrund vid ≤ 10 min */
   if (remain <= 10 * 60 * 1000) { document.body.classList.add('danger'); }
   else { document.body.classList.remove('danger'); }
 
-  /* uppdatera track-bredden så den följer texten */
   sizeTrackToTime();
 
   if(remain<=1000 && remain>0){
@@ -315,7 +311,9 @@ function loop(){
 }
 
 /* --- Inställnings-UI --- */
-function openSettings(v){ settings.style.display = (v===false)? 'none':'block'; }
+function openSettings(v){
+  settings.style.display = (v===false)? 'none':'block';
+}
 function rowTpl(p,i){
   return '<div class="row" data-i="'+i+'">'+
     '<input type="text" value="'+p.name+'" aria-label="Namn" placeholder="Namn (t.ex. Läggdags)" />'+
@@ -340,8 +338,12 @@ function saveRows(){
 }
 
 $('#openSettings').addEventListener('click', function(){ renderRows(); openSettings(true); });
+
+/* Långtryck för att öppna – men INTE om man trycker i ett input */
 var touchTimer=null;
-document.addEventListener('touchstart', function(){
+document.addEventListener('touchstart', function(e){
+  var t=e.target && e.target.tagName;
+  if (t==='INPUT' || t==='TEXTAREA') return;  // låt skrivande vara i fred
   touchTimer=setTimeout(function(){ renderRows(); openSettings(true); }, 650);
 }, {passive:true});
 document.addEventListener('touchend', function(){
