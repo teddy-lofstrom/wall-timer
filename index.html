@@ -6,96 +6,64 @@
 <title>Väggtimer – skalad scen (matchad bar)</title>
 <style>
   :root{
-    --fs-time: 220px;   /* stora siffror i design-ytan (skalning via JS) */
-    --fs-title: 3rem;   /* större rubrik */
+    --fs-time: 220px;
+    --fs-title: 3rem;
     --fs-subtitle: 1.4rem;
 
-    --bar-h: 56px;            /* tjockare bar */
-    --bar-radius: 16px;       /* mer fyrkantig rundning */
-    --bar-bg: #2a2a2a;        /* ofyllda delen */
-    --bar-fill: #ffffff;      /* fyllda delen */
+    --bar-h: 56px;
+    --bar-radius: 16px;
+    --bar-bg: #2a2a2a;
+    --bar-fill: #ffffff;
   }
 
   html,body{
     height:100%; margin:0;
-    background:#000;           /* svart bakgrund */
+    background:#000;
     color:#fff; overflow:hidden;
     -webkit-text-size-adjust:100%; text-size-adjust:100%;
   }
-  body.danger{ background:#A5402D; } /* bakgrund sista 10 minuterna */
+  body.danger{ background:#A5402D; }
 
-  /* === SCEN (fast design-ytan 1280×800 som skalas/centreras) === */
+  /* === SCEN (1280×800, skalas via JS) === */
   #stage{
     position:absolute; left:0; top:0;
-    width:1280px; height:800px;       /* DESIGNMÅTT */
+    width:1280px; height:800px;
     box-sizing:border-box;
     padding:20px;
     display:grid;
-    grid-template-rows:auto auto 1fr auto; /* titel, undertext, klocka, track */
+    grid-template-rows:auto auto 1fr auto;
     gap:12px;
     transform-origin:0 0; will-change:transform; backface-visibility:hidden;
     background:transparent;
   }
 
-  .title{
-    text-align:center; font-weight:800; letter-spacing:.3px; opacity:.98;
-    font-size: var(--fs-title);
-  }
-  .subtitle{
-    text-align:center; font-weight:700; opacity:.95;
-    font-size: var(--fs-subtitle);
-  }
+  .title{ text-align:center; font-weight:800; letter-spacing:.3px; opacity:.98; font-size: var(--fs-title); }
+  .subtitle{ text-align:center; font-weight:700; opacity:.95; font-size: var(--fs-subtitle); }
   .time{
-    display:grid; place-items:center;
-    text-align:center; font-weight:900; line-height:1;
-    letter-spacing:.4px; font-size: var(--fs-time);
-    white-space:nowrap; margin-bottom:8px;
+    display:grid; place-items:center; text-align:center; font-weight:900; line-height:1;
+    letter-spacing:.4px; font-size: var(--fs-time); white-space:nowrap; margin-bottom:8px;
   }
 
-  /* === Track (bar + ticks) === */
-  .track{
-    position:relative;
-    margin: 0 auto;   /* centrerad */
-    padding: 0;       /* ingen sid-padding – bar = exakt samma längd som tids-texten */
-    width: 900px;     /* initial, ersätts av JS */
-  }
-  .bar{
-    position:relative;
-    height: var(--bar-h);
-    background: var(--bar-bg);
-    border-radius: var(--bar-radius);
-    overflow:hidden;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
-  }
-  .fill{
-    position:absolute;
-    left:0; top:0; bottom:0;   /* WebView 59-kompatibelt */
-    height:100%;
-    width:0%;
-    background: var(--bar-fill);
-    border-radius: inherit;
-    transform: translateZ(0);
-  }
+  .track{ position:relative; margin:0 auto; padding:0; width:900px; }
+  .bar{ position:relative; height:var(--bar-h); background:var(--bar-bg); border-radius:var(--bar-radius); overflow:hidden;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+  .fill{ position:absolute; left:0; top:0; bottom:0; height:100%; width:0%; background:var(--bar-fill); border-radius:inherit; transform:translateZ(0); }
 
-  .ticks{ position:relative; height: 52px; }
+  .ticks{ position:relative; height:52px; }
   .tick{ position:absolute; top:0; transform:translateX(-50%); text-align:center; }
-  .tick i{ display:block; width:3px; height:24px; background:rgba(255,255,255,.95);
-           margin:0 auto 6px; border-radius:2px; }
+  .tick i{ display:block; width:3px; height:24px; background:rgba(255,255,255,.95); margin:0 auto 6px; border-radius:2px; }
   .tick span{ font-size:1.15rem; opacity:.98; font-weight:700; }
   .tick.end i{ width:4px; height:28px; background:#fff; }
   .tick.end span{ font-weight:900; }
 
-  /* Settings-knappen: övre högra hörnet */
   .fab{
-    position:absolute; right:16px; top:16px;
-    width:64px; height:64px; z-index:10;
+    position:absolute; right:16px; top:16px; width:64px; height:64px; z-index:10;
     border-radius:999px; display:grid; place-items:center;
-    background:#151515; color:#fff; border:1px solid #2a2a2a;
-    font-size:20px; user-select:none; cursor:pointer; touch-action:manipulation;
+    background:#151515; color:#fff; border:1px solid #2a2a2a; font-size:20px; user-select:none; cursor:pointer; touch-action:manipulation;
     box-shadow: 0 8px 24px rgba(0,0,0,.4);
   }
 
-  /* === INSTÄLLNINGAR – UTANFÖR den skalade scenen === */
+  /* Inställningar (utanför skalad scen) */
   .settings{
     position:fixed; inset:0; background:rgba(0,0,0,.94);
     border:none; padding:20px; display:none; overflow:auto; z-index:9999;
@@ -105,6 +73,7 @@
   .row input{ padding:.8em .9em; border-radius:12px; border:1px solid #2a2a2a; background:#0d0d0d; color:#fff; font-size:1rem;}
   .settings .actions{display:flex; gap:12px; margin-top:10px; flex-wrap:wrap;}
   .settings button{ padding:.9em 1.1em; min-height:48px; border-radius:12px; border:1px solid #2a2a2a; background:#101010; color:#fff; font-weight:700; cursor:pointer; font-size:1rem;}
+  .note{opacity:.7; font-size:.9rem; margin-top:.6rem;}
 </style>
 </head>
 <body>
@@ -122,7 +91,6 @@
     <div class="fab" id="openSettings" aria-label="Inställningar">⚙︎</div>
   </div>
 
-  <!-- INSTÄLLNINGAR (utanför #stage för att undvika transform-buggar på äldre WebView) -->
   <div class="settings" id="settings" aria-modal="true" role="dialog">
     <h2>Perioder</h2>
     <p>Lägg till tidsperioder för dygnet. Timern väljer automatiskt den period som matchar klockslaget och räknar ner till periodens slut.</p>
@@ -133,16 +101,16 @@
       <button id="reset">Återställ standard</button>
       <button id="close">Stäng</button>
     </div>
-    <p><small>Tips: Kör i helskärm. Allt sparas lokalt i webbläsaren.</small></p>
+    <p class="note" id="storageNote"></p>
   </div>
 
 <script>
-/* --- Selektorer --- */
+/* === Selektorer === */
 var $ = function(s){ return document.querySelector(s); };
 var title=$('#title'), subtitle=$('#subtitle'), timeEl=$('#time'), fill=$('#fill'), ticks=$('#ticks');
-var settings=$('#settings'), stage=$('#stage'), track=$('#track');
+var settings=$('#settings'), stage=$('#stage'), track=$('#track'), storageNote=$('#storageNote');
 
-/* --- Perioddata (dina tider) --- */
+/* === Perioddata (dina tider) === */
 var DEFAULT_PERIODS = [
   { name:"Morgon",      start:"06:30", end:"08:00" },
   { name:"Förmiddag",   start:"08:00", end:"12:00" },
@@ -153,31 +121,27 @@ var DEFAULT_PERIODS = [
   { name:"Natt",        start:"22:30", end:"06:30" }
 ];
 
-/* --- LocalStorage helpers --- */
-function getPeriods(){
+/* === Lagring med minnes-fallback === */
+var MEMORY_PERIODS = null;
+function storageAvailable(){
   try{
-    var r=localStorage.getItem('walltimer.periods');
-    var arr=r?JSON.parse(r):DEFAULT_PERIODS;
-    if (Object.prototype.toString.call(arr)!=='[object Array]' || !arr.length) arr = DEFAULT_PERIODS;
-    /* normalisera allt vi läser */
-    return arr.map(function(p){
-      return { name: String(p.name||'Period'),
-               start: normalizeTime(p.start),
-               end:   normalizeTime(p.end) };
-    });
-  }catch(e){
-    return DEFAULT_PERIODS.slice();
-  }
+    var k='__wt_test__'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return true;
+  }catch(e){ return false; }
 }
-function setPeriods(p){ localStorage.setItem('walltimer.periods', JSON.stringify(p)); }
+var HAS_STORAGE = storageAvailable();
 
-/* --- Tidshjälp --- */
-/* Accepterar "06:30", "06.30", "0630", "6 30", "6-30" etc → "06:30" */
+function getRawFromStorage(){
+  if (!HAS_STORAGE) return null;
+  try{ return localStorage.getItem('walltimer.periods'); }catch(e){ return null; }
+}
+function setRawToStorage(str){
+  if (!HAS_STORAGE) return false;
+  try{ localStorage.setItem('walltimer.periods', str); return true; }catch(e){ return false; }
+}
+
 function normalizeTime(v){
   if (v == null) return "00:00";
-  v = String(v).trim();
-  v = v.replace(/[.,;\-\s]+/g, ':');   // ersätt punkt, komma, mellanslag, minus → kolon
-  // tillåt "0630" → "06:30"
+  v = String(v).trim().replace(/[.,;\-\s]+/g, ':');
   var m = v.match(/^(\d{1,2})(?::?(\d{1,2}))?/);
   var h = m && m[1] != null ? parseInt(m[1],10) : 0;
   var mi = m && m[2] != null ? parseInt(m[2],10) : 0;
@@ -187,10 +151,39 @@ function normalizeTime(v){
   mi = Math.max(0, Math.min(59, mi));
   return (h<10?'0':'')+h+':' + (mi<10?'0':'')+mi;
 }
+
+function sanitizeArray(arr){
+  return arr.map(function(p){
+    return { name: String(p.name||'Period'), start: normalizeTime(p.start), end: normalizeTime(p.end) };
+  });
+}
+
+function getPeriods(){
+  if (MEMORY_PERIODS) return MEMORY_PERIODS.slice();
+  var raw = getRawFromStorage();
+  if (raw){
+    try{
+      var arr = JSON.parse(raw);
+      if (Object.prototype.toString.call(arr)==='[object Array]' && arr.length){
+        MEMORY_PERIODS = sanitizeArray(arr);
+        return MEMORY_PERIODS.slice();
+      }
+    }catch(e){}
+  }
+  MEMORY_PERIODS = sanitizeArray(DEFAULT_PERIODS);
+  return MEMORY_PERIODS.slice();
+}
+
+function setPeriods(p){
+  MEMORY_PERIODS = sanitizeArray(p);
+  var ok = setRawToStorage(JSON.stringify(MEMORY_PERIODS));
+  storageNote.textContent = ok ? "Sparat lokalt." : "Obs: Lagring låst – använder tillfällig minneslagring.";
+}
+
+/* === Tidshjälp === */
 function t2m(t){
   var n = normalizeTime(t);
-  var parts = n.split(':');
-  var h = +parts[0], m = +parts[1]||0;
+  var parts = n.split(':'), h = +parts[0], m = +parts[1]||0;
   return (h%24)*60 + m;
 }
 function nowMin(){ var n=new Date(); return n.getHours()*60+n.getMinutes()+n.getSeconds()/60; }
@@ -202,17 +195,16 @@ function fmt(ms){
   return h+'h '+m+'m '+pad2(s)+'s';
 }
 
-/* --- Splitta över midnatt & välj period (Chrome/WebView 59-vänligt) --- */
+/* === Splitta över midnatt & välj period === */
 function expand(ps){
   var out=[];
   for(var i=0;i<ps.length;i++){
     var p=ps[i], a=t2m(p.start), b=t2m(p.end);
     if (b>=a){
-      out.push({ name:p.name, start:p.start, end:p.end, a:a, b:b });
+      out.push({ name:p.name, a:a, b:b });
     }else{
-      /* över midnatt: skapa två segment */
-      out.push({ name:p.name, start:p.start, end:"24:00", a:a, b:1440 });
-      out.push({ name:p.name, start:"00:00", end:p.end, a:0, b:b });
+      out.push({ name:p.name, a:a, b:1440 }); // till midnatt
+      out.push({ name:p.name, a:0,  b:b });   // från midnatt
     }
   }
   out.sort(function(x,y){
@@ -230,11 +222,8 @@ function pick(ps){
     if(n>=p.a && n<p.b){ cur=p; nxt=list[(i+1)%list.length]; break; }
   }
   if(!cur){
-    /* om NaN smugit sig in någonstans, välj första vettiga framtida period */
     nxt = (function(){
-      for(var j=0;j<list.length;j++){
-        if(!isNaN(list[j].a) && list[j].a>n) return list[j];
-      }
+      for(var j=0;j<list.length;j++){ if(!isNaN(list[j].a) && list[j].a>n) return list[j]; }
       return list[0];
     })();
     cur = { name:"Paus", a:n, b:nxt && !isNaN(nxt.a) ? nxt.a : n };
@@ -242,35 +231,25 @@ function pick(ps){
   return {cur:cur, nxt:nxt||list[0]};
 }
 
-/* --- Ticks --- */
-function chooseTickStep(totalMin){
-  if (totalMin <= 120) return 30;
-  if (totalMin <= 480) return 60;
-  return 120;
-}
-function fmtTick(mins){
-  if (mins % 60 === 0) return (mins/60)+'h';
-  return (mins%60)+'m';
-}
+/* === Ticks === */
+function chooseTickStep(totalMin){ if (totalMin <= 120) return 30; if (totalMin <= 480) return 60; return 120; }
+function fmtTick(mins){ return (mins % 60 === 0) ? (mins/60)+'h' : (mins%60)+'m'; }
 function drawTicks(totalMin){
   ticks.innerHTML='';
   var step = chooseTickStep(totalMin);
   for(var at=0; at<totalMin; at+=step){
     var left = (at/totalMin)*100;
     var div = document.createElement('div');
-    div.className='tick';
-    div.style.left = left+'%';
+    div.className='tick'; div.style.left = left+'%';
     div.innerHTML = '<i></i><span>'+fmtTick(at)+'</span>';
     ticks.appendChild(div);
   }
   var end = document.createElement('div');
-  end.className = 'tick end';
-  end.style.left = '100%';
-  end.innerHTML = '<i></i><span>slut</span>';
+  end.className = 'tick end'; end.style.left = '100%'; end.innerHTML = '<i></i><span>slut</span>';
   ticks.appendChild(end);
 }
 
-/* --- Ljudpip vid slut --- */
+/* === Ljud === */
 var audioCtx;
 function beep(ms, freq){
   ms = ms || 200; freq = freq || 880;
@@ -283,35 +262,28 @@ function beep(ms, freq){
   }catch(e){}
 }
 
-/* === SCEN-SKALNING (fix för WebView 59) === */
-var BASE_W = 1280, BASE_H = 800;
-var __lastScale = 1;
+/* === Skalning === */
+var BASE_W = 1280, BASE_H = 800, __lastScale = 1;
 function applyScale(){
   var ww=Math.max(100, window.innerWidth  || document.documentElement.clientWidth  || 0);
   var wh=Math.max(100, window.innerHeight || document.documentElement.clientHeight || 0);
-  var s=Math.min(ww/BASE_W, wh/BASE_H);
-  s=Math.max(0.1,Math.min(4,s));
-  var x=(ww-BASE_W*s)/2;
-  var y=(wh-BASE_H*s)/2;
-  stage.style.transform='translate('+x+'px,'+y+'px) scale('+s+')';
-  __lastScale = s;
+  var s=Math.min(ww/BASE_W, wh/BASE_H); s=Math.max(0.1,Math.min(4,s));
+  var x=(ww-BASE_W*s)/2, y=(wh-BASE_H*s)/2;
+  stage.style.transform='translate('+x+'px,'+y+'px) scale('+s+')'; __lastScale = s;
 }
 window.addEventListener('resize', applyScale);
 window.addEventListener('orientationchange', applyScale);
 
-/* === Matcha barens längd med nedräknarens text === */
+/* === Matcha barens längd === */
 var __trackW = 0;
 function sizeTrackToTime(){
   var rect = timeEl.getBoundingClientRect();
   var wViewport = rect.width || 900;
   var wDesign = Math.max(300, Math.min(BASE_W, Math.round(wViewport / (__lastScale||1))));
-  if (Math.abs(wDesign - __trackW) > 2){   /* undvik jitter */
-    track.style.width = wDesign + 'px';
-    __trackW = wDesign;
-  }
+  if (Math.abs(wDesign - __trackW) > 2){ track.style.width = wDesign + 'px'; __trackW = wDesign; }
 }
 
-/* --- Huvudloop --- */
+/* === Loop === */
 function pad2n(n){ return (n<10?'0':'')+n; }
 function loop(){
   var ps=getPeriods();
@@ -327,10 +299,9 @@ function loop(){
   var endH = pad2n(Math.floor(endMin/60));
   var endM = pad2n(endMin%60);
 
-  /* titel + undertext */
-  title.textContent = 'Tid kvar till ' + nxt.name + ' (kl ' + endH + ':' + endM + ')';
-  subtitle.textContent = 'Nästa: ' + nxt.name + ' \u2192 ' +
-    pad2n(Math.floor(nxt.a/60)) + ':' + pad2n(nxt.a%60);
+  title.textContent = 'Tid kvar till ' + (nxt && nxt.name || '–') + ' (kl ' + endH + ':' + endM + ')';
+  subtitle.textContent = 'Nästa: ' + (nxt && nxt.name || '–') + ' \u2192 ' +
+    pad2n(Math.floor((nxt && nxt.a || 0)/60)) + ':' + pad2n((nxt && nxt.a || 0)%60);
 
   timeEl.textContent = fmt(remain);
 
@@ -339,38 +310,41 @@ function loop(){
 
   drawTicks((cur.b - cur.a));
 
-  /* bakgrund vid ≤ 10 min */
   if (remain <= 10 * 60 * 1000) { document.body.classList.add('danger'); }
   else { document.body.classList.remove('danger'); }
 
-  /* uppdatera track-bredden så den följer texten */
   sizeTrackToTime();
 
   if(remain<=1000 && remain>0){
-    for(var i=0;i<5;i++){
-      (function(k){ setTimeout(function(){ beep(120, 1000+k*60); }, k*180); })(i);
-    }
+    for(var i=0;i<5;i++){ (function(k){ setTimeout(function(){ beep(120, 1000+k*60); }, k*180); })(i); }
   }
 
   requestAnimationFrame(loop);
 }
 
-/* --- Inställnings-UI --- */
-function openSettings(v){ settings.style.display = (v===false)? 'none':'block'; }
+/* === Inställnings-UI === */
+function openSettings(v){ settings.style.display = (v===false)? 'none':'block'; storageNote.textContent = HAS_STORAGE ? "" : "Obs: Lagring låst – använder minneslagring."; }
 function rowTpl(p,i){
   return '<div class="row" data-i="'+i+'">'+
-    '<input type="text" value="'+p.name+'" aria-label="Namn" placeholder="Namn (t.ex. Läggdags)" />'+
+    '<input type="text" value="'+p.name.replace(/"/g,'&quot;')+'" aria-label="Namn" placeholder="Namn (t.ex. Läggdags)" />'+
     '<input type="time" value="'+normalizeTime(p.start)+'" aria-label="Start" />'+
     '<input type="time" value="'+normalizeTime(p.end)+'" aria-label="Slut" />'+
     '<button data-del="'+i+'">Ta bort</button>'+
   '</div>';
 }
 function renderRows(){
-  var rows=$('#rows'); var ps=getPeriods();
-  var html=''; for(var i=0;i<ps.length;i++){ html+=rowTpl(ps[i],i); }
+  var rows=$('#rows'); var ps=getPeriods(); var html='';
+  for(var i=0;i<ps.length;i++){ html+=rowTpl(ps[i],i); }
   rows.innerHTML = html;
 }
 function saveRows(){
+  /* Tvinga commit från eventuellt öppna tid-pickers */
+  if (document.activeElement && typeof document.activeElement.blur === 'function'){
+    document.activeElement.blur();
+  }
+  var inputs = settings.querySelectorAll('input');
+  for (var i=0;i<inputs.length;i++){ if (typeof inputs[i].blur === 'function') inputs[i].blur(); }
+
   var rowEls=[].slice.call(document.querySelectorAll('.row'));
   var arr = rowEls.map(function(r){
     var ins=[].slice.call(r.querySelectorAll('input'));
@@ -379,7 +353,9 @@ function saveRows(){
     var end  =normalizeTime(ins[2].value);
     return { name: name||'Period', start: start, end: end };
   });
-  setPeriods(arr); renderRows(); openSettings(false);
+  setPeriods(arr);
+  renderRows();
+  openSettings(false);
 }
 
 /* Öppna via knapp */
@@ -389,7 +365,7 @@ $('#openSettings').addEventListener('click', function(){ renderRows(); openSetti
 var touchTimer=null;
 document.addEventListener('touchstart', function(e){
   var t=e.target && e.target.tagName;
-  if (t==='INPUT' || t==='TEXTAREA') return;  // låt skrivande vara i fred
+  if (t==='INPUT' || t==='TEXTAREA') return;
   touchTimer=setTimeout(function(){ renderRows(); openSettings(true); }, 650);
 }, {passive:true});
 document.addEventListener('touchend', function(){
@@ -404,23 +380,20 @@ $('#add').addEventListener('click', function(){
 });
 $('#reset').addEventListener('click', function(){
   if (confirm('Återställ perioderna till standard? Dina egna ändringar ersätts.')) {
-    var fresh = DEFAULT_PERIODS.map(function(p){
-      return { name:p.name, start:normalizeTime(p.start), end:normalizeTime(p.end) };
-    });
-    setPeriods(fresh);
-    renderRows();     // uppdatera tabellen
-    openSettings(false); // stäng rutan
+    setPeriods(DEFAULT_PERIODS);
+    renderRows();
+    openSettings(false);
   }
 });
 
-/* Ta bort-raden (delegera klick) */
+/* Delegera borttag */
 settings.addEventListener('click', function(e){
   var el=e.target; if(!el || !el.getAttribute) return;
   var idx=el.getAttribute('data-del'); if(idx==null) return;
   var ps=getPeriods(); ps.splice(+idx,1); setPeriods(ps); renderRows();
 });
 
-/* Dubbeltryck för helskärm (om stöds) */
+/* Dubbeltapp för helskärm */
 document.addEventListener('dblclick', function(){
   var el=document.documentElement; if(el.requestFullscreen) el.requestFullscreen();
 });
