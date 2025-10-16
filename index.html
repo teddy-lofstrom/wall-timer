@@ -3,68 +3,184 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
-<title>Väggtimer – stabil & redigerbar</title>
+<title>Väggtimer – modern look</title>
 <style>
+  /* ========== Design-tokens (enkla, webview-vänliga) ========== */
   :root{
-    --fs-time: 220px;
-    --fs-title: 3rem;
-    --fs-subtitle: 1.4rem;
+    /* Typografi */
+    --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial;
 
-    --bar-h: 56px;
+    --fs-time: clamp(120px, 17vw, 220px);
+    --fs-title: clamp(1.4rem, 2.6vw, 3rem);
+    --fs-subtitle: clamp(1.05rem, 1.6vw, 1.4rem);
+
+    /* Färger */
+    --bg-0: #0b1220;    /* mörk marin */
+    --bg-1: #0e172a;    /* något ljusare marin */
+    --acc-1: #FF8811;   /* barens fyllnad (orange) */
+    --acc-2: #8ab6ff;   /* sekundär accent för text/glow */
+    --danger: #A5402D;  /* bakgrund varning */
+
+    /* Ytor & bar */
+    --bar-h: 64px;
     --bar-radius: 16px;
-    --bar-bg: #2a2a2a;
-    --bar-fill: #ffffff;
+    --bar-bg: rgba(255,255,255,0.07);
+    --bar-fill: var(--acc-1);
+
+    /* Linjer / skuggor */
+    --line: rgba(255,255,255,.08);
+    --line-strong: rgba(255,255,255,.12);
+    --glow: 0 8px 24px rgba(0,0,0,.35);
+
+    /* Touch & spacing */
+    --pad: 20px;
+    --touch: 52px;
+
+    /* Ticks */
+    --tick-line: rgba(255,255,255,.85);
+    --tick-text: rgba(255,255,255,.92);
   }
 
+  /* ========== Bas ========== */
   html,body{
-    height:100%; margin:0;
-    background:#000; color:#fff; overflow:hidden;
+    height:100%; margin:0; color:#eef2ff;
+    font-family: var(--font);
     -webkit-text-size-adjust:100%; text-size-adjust:100%;
+    background:
+      radial-gradient(1200px 800px at 70% -10%, #1b2a4a 0%, transparent 60%),
+      radial-gradient(1200px 800px at -10% 80%, #182647 0%, transparent 55%),
+      linear-gradient(180deg, var(--bg-0), var(--bg-1) 65%, #0a1326 100%);
+    overflow:hidden;
   }
-  body.danger{ background:#A5402D; }
+  body.danger{
+    background:
+      radial-gradient(1200px 800px at 70% -10%, #c45a4a 0%, transparent 60%),
+      radial-gradient(1200px 800px at -10% 80%, #8a3a2f 0%, transparent 55%),
+      linear-gradient(180deg, #2a0e0a, var(--danger) 60%, #35110d 100%);
+  }
 
-  /* === SCEN (1280×800 som skalas via JS) === */
+  /* ========== Scen (1280×800 som skalas) ========== */
   #stage{
-    position:absolute; left:0; top:0;
-    width:1280px; height:800px;
-    box-sizing:border-box; padding:20px;
-    display:grid; grid-template-rows:auto auto 1fr auto; gap:12px;
+    position:absolute; inset:auto;
+    left:0; top:0; width:1280px; height:800px;
+    box-sizing:border-box; padding:var(--pad);
+    display:grid; grid-template-rows:auto auto 1fr auto; gap:16px;
     transform-origin:0 0; will-change:transform; backface-visibility:hidden;
   }
 
-  .title{ text-align:center; font-weight:800; letter-spacing:.3px; opacity:.98; font-size:var(--fs-title); }
-  .subtitle{ text-align:center; font-weight:700; opacity:.95; font-size:var(--fs-subtitle); }
-  .time{ display:grid; place-items:center; text-align:center; font-weight:900; line-height:1; letter-spacing:.4px; font-size:var(--fs-time); white-space:nowrap; margin-bottom:8px; }
+  /* ========== Typografi ========== */
+  .title{
+    text-align:center; font-weight:800; letter-spacing:.3px; opacity:.98;
+    font-size:var(--fs-title);
+    text-shadow: 0 2px 12px rgba(0,0,0,.35);
+  }
+  .subtitle{
+    text-align:center; font-weight:700; opacity:.92; font-size:var(--fs-subtitle);
+    color:#dfe8ff;
+  }
+  .time{
+    display:grid; place-items:center; text-align:center; font-weight:900;
+    line-height:1; letter-spacing:.4px; font-size:var(--fs-time);
+    white-space:nowrap; margin-bottom:6px;
+    color:#ffffff;
+    text-shadow:
+      0 12px 30px rgba(0,0,0,.5),
+      0 0 20px rgba(138,182,255,.08);
+  }
 
+  /* ========== Progressbar & ticks ========== */
   .track{ position:relative; margin:0 auto; padding:0; width:900px; }
-  .bar{ position:relative; height:var(--bar-h); background:var(--bar-bg); border-radius:var(--bar-radius); overflow:hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
-  .fill{ position:absolute; left:0; top:0; bottom:0; height:100%; width:0%; background:var(--bar-fill); border-radius:inherit; transform:translateZ(0); }
+  .bar{
+    position:relative; height:var(--bar-h);
+    background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04));
+    border-radius:var(--bar-radius); overflow:hidden;
+    box-shadow: inset 0 0 0 1px var(--line-strong), var(--glow);
+  }
+  .fill{
+    position:absolute; left:0; top:0; bottom:0; height:100%; width:0%;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.25), rgba(255,255,255,0) 60%),
+      linear-gradient(90deg, rgba(255,255,255,.08), rgba(255,255,255,0) 40%),
+      linear-gradient(180deg, #ffb15e, var(--bar-fill) 35%, #e06f00 100%);
+    border-radius:inherit; transform:translateZ(0);
+  }
 
-  .ticks{ position:relative; height:52px; }
-  .tick{ position:absolute; top:0; transform:translateX(-50%); text-align:center; }
-  .tick i{ display:block; width:3px; height:24px; background:rgba(255,255,255,.95); margin:0 auto 6px; border-radius:2px; }
-  .tick span{ font-size:1.15rem; opacity:.98; font-weight:700; }
-  .tick.end i{ width:4px; height:28px; background:#fff; }
-  .tick.end span{ font-weight:900; }
+  .ticks{ position:relative; height:60px; }
+  .tick{
+    position:absolute; top:0; transform:translateX(-50%); text-align:center;
+    color:var(--tick-text);
+  }
+  .tick i{
+    display:block; width:2px; height:28px; background:var(--tick-line);
+    margin:0 auto 8px; border-radius:2px;
+    box-shadow: 0 6px 12px rgba(0,0,0,.25);
+  }
+  .tick span{
+    display:inline-block; padding:.18rem .5rem; border-radius:999px;
+    font-size:1rem; font-weight:700; letter-spacing:.2px;
+    background: rgba(255,255,255,.06); border:1px solid var(--line);
+  }
+  .tick.end i{ width:3px; height:32px; background:#fff; }
+  .tick.end span{ background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.18); }
 
+  /* ========== Flytande inställningsknapp ========== */
   .fab{
     position:absolute; right:16px; top:16px; width:64px; height:64px; z-index:10;
     border-radius:999px; display:grid; place-items:center;
-    background:#151515; color:#fff; border:1px solid #2a2a2a; font-size:20px; user-select:none; cursor:pointer; touch-action:manipulation;
-    box-shadow: 0 8px 24px rgba(0,0,0,.4);
+    background: rgba(255,255,255,.06);
+    color:#fff; border:1px solid var(--line-strong); font-size:22px; user-select:none;
+    cursor:pointer; touch-action:manipulation;
+    box-shadow: 0 8px 24px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.05);
+  }
+  .fab:active{ transform: scale(.98); }
+
+  /* ========== Inställningar (glassy overlay) ========== */
+  .settings{
+    position:fixed; inset:0; background:rgba(6,10,20,.75);
+    border:none; padding:24px; display:none; overflow:auto; z-index:9999;
+  }
+  .settings h2{margin:.2em 0 .6em; font-size:1.375rem; font-weight:800;}
+  .settings p{ opacity:.9; }
+  .card{
+    max-width:980px; margin:14px auto 0; padding:18px;
+    background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+    border:1px solid var(--line-strong); border-radius:18px;
+    box-shadow: var(--glow);
+  }
+  .row{
+    display:grid; grid-template-columns:1.2fr 1fr 1fr auto;
+    gap:10px; align-items:center; margin:.5em 0;
+  }
+  .row input{
+    padding:.9em 1rem; min-height:var(--touch); border-radius:12px;
+    border:1px solid var(--line-strong);
+    background: rgba(255,255,255,.08); color:#fff; font-size:1rem;
+    outline:none;
+  }
+  .row input:focus{ box-shadow: 0 0 0 3px rgba(138,182,255,.25); border-color:#9fbefc; }
+
+  .settings .actions{display:flex; gap:12px; margin-top:14px; flex-wrap:wrap;}
+  .settings button{
+    padding:.95em 1.1em; min-height:var(--touch); border-radius:12px;
+    border:1px solid var(--line-strong); background:rgba(255,255,255,.08);
+    color:#fff; font-weight:800; cursor:pointer; font-size:1rem;
+    box-shadow: var(--glow);
+  }
+  .settings button:hover{ background:rgba(255,255,255,.12); }
+  .settings button:active{ transform: translateY(1px); }
+
+  .btn-accent{
+    background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.06));
+    border-color: rgba(255,255,255,.18);
   }
 
-  /* === INSTÄLLNINGAR – utanför skalad scen (fix för input-bugg) === */
-  .settings{
-    position:fixed; inset:0; background:rgba(0,0,0,.94);
-    border:none; padding:20px; display:none; overflow:auto; z-index:9999;
+  .note{opacity:.8; font-size:.95rem; margin-top:.7rem;}
+
+  /* ========== Rörelse (lågintensiv / respekt för äldre webviews) ========== */
+  *{ transition: background .25s ease, color .25s ease, border-color .25s ease; }
+  @media (prefers-reduced-motion: reduce){
+    *{ transition: none !important; }
   }
-  .settings h2{margin:.2em 0 .6em; font-size:1.375rem;}
-  .row{display:grid; grid-template-columns:1.2fr 1fr 1fr auto; gap:10px; align-items:center; margin:.5em 0;}
-  .row input{ padding:.8em .9em; border-radius:12px; border:1px solid #2a2a2a; background:#0d0d0d; color:#fff; font-size:1rem;}
-  .settings .actions{display:flex; gap:12px; margin-top:10px; flex-wrap:wrap;}
-  .settings button{ padding:.9em 1.1em; min-height:48px; border-radius:12px; border:1px solid #2a2a2a; background:#101010; color:#fff; font-weight:700; cursor:pointer; font-size:1rem;}
-  .note{opacity:.7; font-size:.9rem; margin-top:.6rem;}
 </style>
 </head>
 <body>
@@ -82,17 +198,20 @@
     <div class="fab" id="openSettings" aria-label="Inställningar">⚙︎</div>
   </div>
 
+  <!-- Inställningar i en “card” för snyggare layout -->
   <div class="settings" id="settings" aria-modal="true" role="dialog">
-    <h2>Perioder</h2>
-    <p>Lägg till tidsperioder för dygnet. Timern väljer automatiskt den period som matchar klockslaget och räknar ner till periodens slut.</p>
-    <div id="rows"></div>
-    <div class="actions">
-      <button id="add">+ Lägg till period</button>
-      <button id="save">Spara</button>
-      <button id="reset">Återställ standard</button>
-      <button id="close">Stäng</button>
+    <div class="card">
+      <h2>Perioder</h2>
+      <p>Lägg till tidsperioder för dygnet. Timern väljer automatiskt den period som matchar klockslaget och räknar ner till periodens slut.</p>
+      <div id="rows"></div>
+      <div class="actions">
+        <button id="add">+ Lägg till period</button>
+        <button id="save" class="btn-accent">Spara</button>
+        <button id="reset">Återställ standard</button>
+        <button id="close">Stäng</button>
+      </div>
+      <p class="note" id="storageNote"></p>
     </div>
-    <p class="note" id="storageNote"></p>
   </div>
 
 <script>
@@ -101,7 +220,7 @@ var $ = function(s){ return document.querySelector(s); };
 var title=$('#title'), subtitle=$('#subtitle'), timeEl=$('#time'), fill=$('#fill'), ticks=$('#ticks');
 var settings=$('#settings'), stage=$('#stage'), track=$('#track'), storageNote=$('#storageNote');
 
-/* ===== Dina standardperioder ===== */
+/* ===== Standardperioder ===== */
 var DEFAULT_PERIODS = [
   { name:"Morgon",      start:"06:30", end:"08:00" },
   { name:"Förmiddag",   start:"08:00", end:"12:00" },
@@ -119,7 +238,6 @@ function storageAvailable(){
   catch(e){ return false; }
 }
 var HAS_STORAGE = storageAvailable();
-
 function getRawFromStorage(){
   if (!HAS_STORAGE) return null;
   try{ return localStorage.getItem('walltimer.periods'); }catch(e){ return null; }
@@ -148,7 +266,7 @@ function fmt(ms){
   var m=Math.floor(s/60); s-=m*60; return h+'h '+m+'m '+pad2(s)+'s';
 }
 
-/* ===== Period-state (enda sanningen) ===== */
+/* ===== Period-state ===== */
 function sanitizeArray(arr){
   return arr.map(function(p){
     return { name: String(p.name||'Period'),
@@ -188,8 +306,7 @@ function expand(ps){
   out.sort(function(x,y){ return x.a - y.a; });
   return out;
 }
-
-/* —— FIX #1: välj nästa period med ANNORLUNDA namn —— */
+/* Välj nästa period med annorlunda namn (fix för midnatt) */
 function pick(ps){
   var n=nowMin(), list=expand(ps);
   var idx=-1, cur=null;
@@ -198,21 +315,16 @@ function pick(ps){
     if(n>=p.a && n<p.b){ idx=i; cur=p; break; }
   }
   if(idx===-1){
-    // Vi är mellan perioder → "Paus" tills nästa start
-    var nxtIdx = list.findIndex(function(p){ return p.a>n; });
+    var nxtIdx = -1;
+    for (var j=0;j<list.length;j++){ if (list[j].a>n){ nxtIdx=j; break; } }
     if (nxtIdx===-1) nxtIdx = 0;
-    return {
-      cur: { name:"Paus", a:n, b:list[nxtIdx].a },
-      nxt: list[nxtIdx]
-    };
+    return { cur:{ name:"Paus", a:n, b:list[nxtIdx].a }, nxt:list[nxtIdx] };
   }
-  // hitta nästa element med annat namn än cur.name
   var nxt=null;
   for(var k=1;k<=list.length;k++){
     var cand=list[(idx+k)%list.length];
     if (cand.name !== cur.name){ nxt=cand; break; }
   }
-  // fall-back om allt skulle ha samma namn (teoretiskt)
   if(!nxt) nxt=list[(idx+1)%list.length];
   return {cur:cur, nxt:nxt};
 }
@@ -266,7 +378,7 @@ var __trackW = 0;
 function sizeTrackToTime(){
   var rect = timeEl.getBoundingClientRect();
   var wViewport = rect.width || 900;
-  var wDesign = Math.max(300, Math.min(BASE_W, Math.round(wViewport / (__lastScale||1))));
+  var wDesign = Math.max(320, Math.min(BASE_W, Math.round(wViewport / (__lastScale||1))));
   if (Math.abs(wDesign - __trackW) > 2){ track.style.width = wDesign + 'px'; __trackW = wDesign; }
 }
 
@@ -286,7 +398,6 @@ function loop(){
   var curEndH = pad2n(Math.floor(curEndMin/60)), curEndM = pad2n(curEndMin%60);
   var nxtStartH = pad2n(Math.floor(nxt.a/60)), nxtStartM = pad2n(nxt.a%60);
 
-  /* —— FIX #2: tydlig text —— */
   title.textContent = 'Tid kvar av ' + cur.name + ' (slutar kl ' + curEndH + ':' + curEndM + ')';
   subtitle.textContent = 'Nästa: ' + nxt.name + ' → ' + nxtStartH + ':' + nxtStartM;
 
@@ -325,7 +436,6 @@ function renderRows(){
   rows.innerHTML = html;
 }
 function saveRows(){
-  /* Tvinga commit från ev. öppna tid-pickers (viktigt på äldre WebView/Silk) */
   if (document.activeElement && typeof document.activeElement.blur === 'function'){
     document.activeElement.blur();
   }
@@ -333,7 +443,6 @@ function saveRows(){
   for (var i=0;i<timeInputs.length;i++){
     if (typeof timeInputs[i].blur === 'function') timeInputs[i].blur();
   }
-
   var rowEls=[].slice.call(document.querySelectorAll('.row'));
   var arr = rowEls.map(function(r){
     var ins=[].slice.call(r.querySelectorAll('input'));
